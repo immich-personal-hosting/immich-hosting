@@ -1,0 +1,13 @@
+clients:
+  - url: http://loki:3100/loki/api/v1/push # Replace 'loki' with your Loki service name or IP
+scrape_configs:
+  - job_name: journal
+    journal:
+      max_age: 12h
+      labels:
+        job: systemd-journal
+    relabel_configs:
+      - source_labels: ['__journal_systemd_unit']
+        target_label: 'unit'
+      - source_labels: ['__journal_executable']
+        target_label: 'executable'

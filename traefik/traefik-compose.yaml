@@ -1,0 +1,61 @@
+version: "3.8"
+services:
+  traefik:
+    image: traefik:latest
+    deploy:
+      labels:
+        - "traefik.http.routers.dashboard.rule=Host(`traefik.raspberrypi`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+        - "traefik.http.routers.dashboard.service=api@internal"
+        - "traefik.http.routers.dashboard.middlewares=auth"
+        - "traefik.http.middlewares.auth.basicauth.users=test:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/,test2:$$apr1$$d9hr9HBB$$4HxwgUir3HP4EsggP/QNo0"
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - traefik_network
+    environment:
+      - DUCKDNS_TOKEN=1446cb31-2836-4901-b533-1f51b0ddc79b
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    labels:
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.raspberrypi`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=test:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/,test2:$$apr1$$d9hr9HBB$$4HxwgUir3HP4EsggP/QNo0"
+    volumes:
+      - "certs:/data"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "letsencrypt:/letsencrypt"
+    command:
+      - "--log.level=DEBUG"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entryPoints.websecure.address=:443"
+      - "--entryPoints.websecure.transport.respondingTimeouts.readTimeout=3h"
+      - "--entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s"
+      - "--providers.swarm.endpoint=unix:///var/run/docker.sock"
+      - "--providers.swarm.network=traefik_traefik_network"
+      - "--providers.swarm.exposedByDefault=false"
+      - "--providers.swarm.watch=true"
+      - "--api.dashboard=true"
+      - "--api.debug=true"
+      - "--api.insecure=true"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=duckdns"
+      - "--certificatesresolvers.myresolver.acme.email=divyakumarjain@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+
+networks:
+  traefik_network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  letsencrypt:
+    external: true
+  certs:
+    external: true

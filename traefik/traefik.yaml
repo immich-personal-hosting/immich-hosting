@@ -1,0 +1,29 @@
+log:
+  level: DEBUG
+
+global:
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+    transport:
+      respondingTimeouts:
+        readTimeout: "3h"
+        writeTimeout: "0s"
+
+providers:
+  docker:
+    exposedByDefault: false
+    watch: true
+    network: traefik_network
+
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: divyakumarjain@gmail.com
+      storage: /data/certs.json
+      httpChallenge:
+        entryPoint: web

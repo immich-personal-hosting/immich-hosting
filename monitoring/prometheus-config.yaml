@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: immich_api
+    static_configs:
+      - targets: ['immich-server:8081']
+  - job_name: immich_microservices
+    static_configs:
+      - targets: ['immich-microservices:8082']
+  - job_name: 'node-exporter'
+    dns_sd_configs:
+      - names:
+          - 'tasks.node-exporter'
+        type: 'A'
+        port: 9100
+    relabel_configs:
+      # Use regex to extract only the server name part before the port
+      - source_labels: ['__address__']
+        regex: '([^:]+)(:\d+)?' # Captures hostname/IP and optional port
+        replacement: '$1' # Uses the first capture group (hostname/IP)
+        target_label: 'instance'

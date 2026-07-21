@@ -1,0 +1,119 @@
+version: '3.8'
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    deploy:
+      replicas: 1
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.role == manager
+    configs:
+      - source: prometheus_config
+        target: /prometheus/prometheus.yml
+    user: root
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - monitoring
+    command:
+      - --web.enable-remote-write-receiver
+
+#  node-exporter:
+#    image: prom/node-exporter:latest
+#    deploy:
+#      mode: global
+#    volumes:
+#      - /proc:/host/proc:ro
+#      - /sys:/host/sys:ro
+#      - /:/rootfs:ro
+#    command:
+#      - '--path.procfs=/host/proc'
+#      - '--path.rootfs=/rootfs'
+#      - '--path.sysfs=/host/sys'
+#      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+#    networks:
+#      - monitoring
+
+  grafana-alloy:
+    image: grafana/alloy:latest
+    deploy:
+      mode: global
+    networks:
+      - monitoring
+    volumes:
+      # Mount necessary host paths for metrics collection
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/rootfs:ro
+      # Mount Docker socket for container/swarm discovery and logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount container log directory for log collection
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command:
+      # Specify the configuration file location
+      - 'run'
+      - '--server.http.listen-addr=0.0.0.0:12345'
+      - '--storage.path=/var/lib/alloy/data'
+      - '/etc/alloy/config.alloy'
+    configs:
+      - source: alloy_config
+        target: /etc/alloy/config.alloy
+    ports:
+      - 12345:12345
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    configs:
+      - source:  grafana_prometheus_config
+        target: /etc/grafana/provisioning/datasources/prometheus.yaml
+      - source:  grafana_loki_config
+        target: /etc/grafana/provisioning/datasources/loki.yaml
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - '3100:3100'
+    configs:
+      - source: loki_config
+        target: /etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring
+
+configs:
+  prometheus_config:
+    file: ./prometheus-config.yaml
+
+  loki_config:
+    file: ./loki-config.yaml
+
+  grafana_prometheus_config:
+    file: ./grafana-prometheus-config.yaml
+
+  grafana_loki_config:
+    file: ./grafana-loki-config.yaml
+  alloy_config:
+    file: ./alloy-config.alloy
+volumes:
+  loki-data:
+  grafana_data:
+
+networks:
+  monitoring:
+    driver: overlay
+    attachable: true
+  immich:
+    name: immich_immich
+    external: true
+  lan:
+    name: host
+    external: true
