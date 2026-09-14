@@ -1,0 +1,4 @@
+creation_rules:
+  - path_regex: clusters/raspberrypi/secrets/.*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age10j22qkq3gxn7779zyle9d4segrhstevjtjmw8hh0e488qzfu3cpskld2ey
