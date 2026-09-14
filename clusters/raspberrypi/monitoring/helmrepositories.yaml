@@ -1,0 +1,21 @@
+---
+# Chart source for the `prometheus` subchart (metrics/Chart.yaml dependency).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: prometheus-community
+  namespace: monitoring
+spec:
+  interval: 1h
+  url: https://prometheus-community.github.io/helm-charts
+---
+# Chart source for the `grafana`, `loki`, and `promtail` subcharts (metrics/Chart.yaml
+# dependencies) -- all three are published from the same Grafana Labs repo.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  interval: 1h
+  url: https://grafana.github.io/helm-charts
