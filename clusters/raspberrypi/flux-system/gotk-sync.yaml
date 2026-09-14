@@ -25,3 +25,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
+  # Manually added (not flux-generated): lets kustomize-controller decrypt SOPS/age
+  # secrets under clusters/raspberrypi/secrets/. Requires an in-cluster Secret named
+  # sops-age in this namespace holding the age private key -- see
+  # clusters/raspberrypi/secrets/README.md.
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
