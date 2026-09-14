@@ -1,0 +1,45 @@
+# Raw manifests (not part of the immich-app chart release) — apply with:
+#   kubectl apply -f ingress.yaml -n immich
+#
+# Verified byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-ingress.yaml on
+# raspberrypi and immich-infra/docs/audit-raw/raw-manifests/immich-ingress.yaml.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: immich-ingress
+  namespace: immich
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: immich-immich-buffering@kubernetescrd
+
+spec:
+  # CRITICAL ROUTING FIX: This forces Traefik to look at this Ingress file
+  ingressClassName: traefik
+  rules:
+  - host: "immich.raspberrypi"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: immich-server
+            port:
+              number: 2283
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: immich-buffering
+  namespace: immich
+spec:
+  buffering:
+    maxRequestBodyBytes: 10485760000 # Fixes the cutoff text to a clean 10GB buffer limit
+
+# KNOWN GAP (see immich-infra/docs/CURRENT_STATE.md "Known gaps"): no `tls:` block and no
+# cert-manager.io/cluster-issuer annotation here, so this Ingress serves plaintext HTTP only
+# even though cert-manager is installed. See ../cert-manager/cluster-issuer.yaml for the
+# related (also-broken) ClusterIssuer. Left as-is — TLS intent here is unconfirmed, not a
+# bug to silently patch while restructuring the repo.

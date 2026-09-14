@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafana-data-pv
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: metrics
+    storage.type: nfs
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-manual
+  mountOptions:
+    - nfsvers=3
+    - hard
+    - timeo=600
+    - retrans=2
+    - noresvport
+  nfs:
+    server: omv
+    path: /export/storage/metrics/grafana

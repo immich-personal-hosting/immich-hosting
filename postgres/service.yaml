@@ -1,0 +1,18 @@
+# Not Helm-managed. Apply with:
+#   kubectl apply -f service.yaml -n immich
+#
+# Recovered verbatim from a `kubectl apply -f - <<EOF ... EOF` heredoc in raspberrypi's shell
+# history — this Service was applied inline and never saved as a file on the Pi, unlike the
+# other manifests in this repo, so there's no on-disk source to diff against.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-postgres-service
+  namespace: immich
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: immich-postgres

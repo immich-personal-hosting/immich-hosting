@@ -1,0 +1,79 @@
+# Values for the immich-app chart, as actually running on the cluster
+# (verified byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-cv.yaml on
+# raspberrypi and to immich-infra/docs/audit-raw/raw-manifests/immich-cv.yaml).
+
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          tag: v3.1.0
+        env:
+          REDIS_HOSTNAME: "immich-valkey"
+          # CRITICAL FIX FOR v3: Explicitly map your network service endpoint strings here
+          DB_HOSTNAME: "immich-postgres-service"
+          DB_PORT: "5432"
+          DB_USERNAME: "postgres"
+          # KNOWN GAP (see immich-infra/docs/CURRENT_STATE.md "Known gaps"): this is a
+          # plaintext literal, not sourced from a Secret. Don't "fix" this silently by
+          # swapping in a Secret ref without also rotating the actual Postgres password —
+          # see ../secrets/README.md for the intended pattern once that's ready.
+          DB_PASSWORD: "postgres"
+          DB_DATABASE_NAME: "immich"
+          IMMICH_TELEMETRY_INCLUDE: "all"
+          IMMICH_LOG_FORMAT: "json"
+          IMMICH_MACHINE_LEARNING_URL: "http://immich-machine-learning:3003"
+
+
+service:
+  main:
+    ports:
+      http:
+        port: 2283
+      metrics:
+        port: 8081
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/path: "/metrics"
+      prometheus.io/port: "8081"
+
+
+# HAILO-8 NPU HARDWARE MAP ACCELERATION BLOCK
+immich-machine-learning:
+  enabled: true
+
+  # Custom Helm Controller injection to give the pod raw hardware pass-through
+  controllers:
+    machine-learning:
+      containers:
+        machine-learning:
+          # Required for a container to directly manipulate the PCIe M.2 bus
+          securityContext:
+            privileged: true
+          # Mount the character device map into the container filesystem context
+          volumeMounts:
+            - name: hailo-device
+              mountPath: /dev/hailo0
+      # KNOWN GAP (see immich-infra/docs/CURRENT_STATE.md "Known gaps"): no nodeAffinity/
+      # nodeSelector pins this to the node that actually has /dev/hailo0 (currently `omv`).
+      # A reschedule onto a node without the device will crash-loop. Left as-is here to
+      # mirror the live cluster faithfully — this is the Fixer's highest-priority proposal
+      # candidate, not something to patch quietly while restructuring the repo.
+
+  # Link the actual physical character file from the Raspberry Pi motherboard layer
+  volumes:
+    - name: hailo-device
+      hostPath:
+        path: /dev/hailo0
+        type: CharDevice
+
+
+# Mount Immich Photos directly to your NFS folder
+immich:
+  persistence:
+    library:
+      existingClaim: "immich-nfs-pvc" # see pvc.yaml in this directory
+
+# Enable the built-in Valkey instance to handle application caching
+valkey:
+  enabled: true

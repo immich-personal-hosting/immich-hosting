@@ -1,0 +1,108 @@
+prometheus:
+  server:
+    retention: 30d
+    retentionSize: 50GB
+    persistentVolume:
+      enabled: true
+      existingClaim: prometheus-data-pvc
+    extraScrapeConfigs: |
+      - job_name: 'kubernetes-service-endpoints-scrapper'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+          - action: labelmap
+            regex: __meta_kubernetes_service_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_service_name]
+            action: replace
+            target_label: kubernetes_name
+
+  kube-state-metrics:
+    enabled: true
+
+  prometheus-node-exporter:
+    enabled: true
+
+  prometheus-pushgateway:
+    enabled: false
+
+  alertmanager:
+    enabled: false
+
+grafana:
+  persistence:
+    enabled: true
+    existingClaim: grafana-data-pvc
+
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://metrics-prometheus-server
+          isDefault: true
+          editable: false
+        - name: Loki
+          type: loki
+          access: proxy
+          url: http://metrics-loki.monitoring.svc.cluster.local:3100
+          editable: false
+
+loki:
+  auth_enabled: false
+  deploymentMode: SingleBinary
+  
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+    schemaConfig:
+      configs:
+        - from: "2024-04-01"
+          object_store: filesystem
+          store: tsdb
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+
+  # CORRECT TOGGLES FOR LOKI V6 SUB-CHARTS
+  loki-canary:
+    enabled: false
+  chunks-cache:
+    enabled: false
+  results-cache:
+    enabled: false
+    
+  # Turn off the scalable microservice targets explicitly
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  backend:
+    replicas: 0
+  gateway:
+    enabled: false
+
+promtail:
+  config:
+    clients:
+      - url: http://metrics-loki.monitoring.svc.cluster.local:3100/loki/api/v1/push

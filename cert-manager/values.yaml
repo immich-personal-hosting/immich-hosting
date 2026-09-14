@@ -1,0 +1,17 @@
+# cert-manager, installed from:
+#   oci://quay.io/jetstack/charts/cert-manager
+# (confirmed from raspberrypi's shell history — earlier attempts used the now-deprecated
+# `--set installCRDs=true` flag and a plain `jetstack/cert-manager` repo add; the last
+# working install command was:
+#   helm install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+#     --kubeconfig=/etc/rancher/k3s/k3s.yaml --namespace cert-manager --create-namespace \
+#     --set crds.enabled=true
+# Live release reports chart version cert-manager-v1.21.0 per immich-infra's audit.)
+#
+# No deliberate value overrides were found in the audit beyond CRD installation — the
+# computed-values dump (immich-infra/docs/audit-raw/helm/cert-manager_values.yaml) is the
+# chart's full default set, not a record of what was explicitly overridden, so it isn't
+# copied here verbatim to avoid implying these were all deliberate choices.
+
+crds:
+  enabled: true

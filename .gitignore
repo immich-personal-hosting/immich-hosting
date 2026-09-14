@@ -1,0 +1,5 @@
+.DS_Store
+# Built subchart archives — run `helm dependency build` instead of committing these
+charts/*.tgz
+monitoring/charts/
+*.dec.yaml

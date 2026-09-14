@@ -1,0 +1,58 @@
+# Not Helm-managed — Postgres is deployed as a raw Kubernetes Deployment, not part of the
+# Immich Helm release. Apply with:
+#   kubectl apply -f deployment.yaml -n immich
+#
+# Verified byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-postgres.yaml on
+# raspberrypi and immich-infra/docs/audit-raw/raw-manifests/immich-postgres.yaml.
+#
+# KNOWN GAPS (see immich-infra/docs/CURRENT_STATE.md "Known gaps"):
+#   - POSTGRES_PASSWORD is a plaintext literal, not sourced from a Secret (see ../secrets/README.md)
+#   - single replica, no HA/read replicas, no Patroni/operator
+#   - no backup strategy (see postgres/pvc.yaml)
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-postgres
+  namespace: immich
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-postgres
+  template:
+    metadata:
+      labels:
+        app: immich-postgres
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: "raspberrypi"
+      containers:
+        - name: postgres
+          # Match your exact Docker Swarm image version to keep disk compatibility
+          image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:32324a2f41df5de9efe1af166b7008c3f55646f8d0e00d9550c16c9822366b4a
+          env:
+            - name: POSTGRES_PASSWORD
+              value: "postgres"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_DB
+              value: "immich"
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            # Mount the shared memory block inside the container
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: postgres-local-pvc
+        # Allocate shared memory for vector calculation performance
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
