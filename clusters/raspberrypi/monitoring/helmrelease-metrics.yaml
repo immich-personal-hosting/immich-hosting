@@ -1,0 +1,3490 @@
+# DRAFT -- generated to bring the existing `metrics` Helm release (installed by hand,
+# currently at revision 14 per `helm list -A`) under Flux management. suspend: true below
+# on purpose -- do not remove it without checking with the owner first.
+#
+# spec.values below is `helm get values metrics -n monitoring -a` (full computed values,
+# not just the overrides in monitoring/values.yaml) captured live on 2026-09-14, with one
+# field redacted -- search this file for "TODO(secret)" -- and grafana.admin.existingSecret
+# repointed at a SOPS-managed Secret (see PR #3) instead of the chart auto-generating one.
+#
+# NOTE on chart.spec.sourceRef: `metrics` is a local umbrella chart (monitoring/Chart.yaml
+# in this repo, version 0.1.0) with four dependencies vendored via Chart.lock -- it is not
+# itself published to prometheus-community/grafana, only its subcharts are. So this
+# HelmRelease sources the chart from the `flux-system` GitRepository (already registered,
+# watching this repo) at path ./monitoring, NOT from the HelmRepository objects in
+# helmrepositories.yaml alongside this file. Those HelmRepository resources are declared as
+# requested for the two upstream chart sources, but source-controller will actually resolve
+# metrics/Chart.yaml's dependency `repository:` URLs directly when building the chart from
+# git -- they aren't wired into this HelmRelease's sourceRef. See the PR description for
+# the full list of things flagged here.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metrics
+  namespace: monitoring
+spec:
+  interval: 30m
+  suspend: true
+  releaseName: metrics
+  chart:
+    spec:
+      chart: ./monitoring
+      sourceRef:
+        kind: GitRepository
+        name: flux-system
+        namespace: flux-system
+      # NOTE: version is not meaningful for a GitRepository-sourced chart -- Flux uses
+      # whatever version is in Chart.yaml at the resolved git revision, currently 0.1.0.
+      # Flagged in the PR description as a field that didn't map cleanly.
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    grafana:
+      admin:
+        # Was "" (chart auto-generates/self-manages the Secret) when this draft was first
+        # written. Now pointed at the SOPS-managed metrics-grafana Secret from
+        # clusters/raspberrypi/secrets/grafana-admin.enc.yaml (see PR #3) instead, so Flux
+        # doesn't fight the chart's own auto-generation logic once this is unsuspended.
+        existingSecret: metrics-grafana
+        passwordKey: admin-password
+        userKey: admin-user
+      adminUser: admin
+      affinity: {}
+      alerting: {}
+      assertNoLeakedSecrets: true
+      automountServiceAccountToken: true
+      autoscaling:
+        behavior: {}
+        enabled: false
+        maxReplicas: 5
+        minReplicas: 1
+        targetCPU: "60"
+        targetMemory: ""
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+      createConfigmap: true
+      dashboardProviders: {}
+      dashboards: {}
+      dashboardsConfigMaps: {}
+      datasources:
+        datasources.yaml:
+          apiVersion: 1
+          datasources:
+          - access: proxy
+            editable: false
+            isDefault: true
+            name: Prometheus
+            type: prometheus
+            url: http://metrics-prometheus-server
+          - access: proxy
+            editable: false
+            name: Loki
+            type: loki
+            url: http://metrics-loki.monitoring.svc.cluster.local:3100
+      defaultCurlOptions: -skf
+      deploymentStrategy:
+        type: RollingUpdate
+      dnsConfig: {}
+      downloadDashboards:
+        env: {}
+        envFromSecret: ""
+        envValueFrom: {}
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      downloadDashboardsImage:
+        pullPolicy: IfNotPresent
+        registry: docker.io
+        repository: curlimages/curl
+        sha: ""
+        tag: 8.9.1
+      enableKubeBackwardCompatibility: false
+      enableServiceLinks: true
+      env: {}
+      envFromConfigMaps: []
+      envFromSecret: ""
+      envFromSecrets: []
+      envRenderSecret: {}
+      envValueFrom: {}
+      extraConfigmapMounts: []
+      extraContainerVolumes: []
+      extraContainers: ""
+      extraEmptyDirMounts: []
+      extraExposePorts: []
+      extraInitContainers: []
+      extraLabels: {}
+      extraObjects: []
+      extraSecretMounts: []
+      extraVolumeMounts: []
+      extraVolumes: []
+      global:
+        imagePullSecrets: []
+      gossipPortName: gossip
+      grafana.ini:
+        analytics:
+          check_for_updates: true
+        grafana_net:
+          url: https://grafana.net
+        log:
+          mode: console
+        paths:
+          data: /var/lib/grafana/
+          logs: /var/log/grafana
+          plugins: /var/lib/grafana/plugins
+          provisioning: /etc/grafana/provisioning
+        server:
+          domain: '{{ if (and .Values.ingress.enabled .Values.ingress.hosts) }}{{ tpl
+            (.Values.ingress.hosts | first) . }}{{ else }}''''{{ end }}'
+      headlessService: false
+      hostAliases: []
+      image:
+        pullPolicy: IfNotPresent
+        pullSecrets: []
+        registry: docker.io
+        repository: grafana/grafana
+        sha: ""
+        tag: ""
+      imageRenderer:
+        affinity: {}
+        automountServiceAccountToken: false
+        autoscaling:
+          behavior: {}
+          enabled: false
+          maxReplicas: 5
+          minReplicas: 1
+          targetCPU: "60"
+          targetMemory: ""
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+        deploymentStrategy: {}
+        enabled: false
+        env:
+          HTTP_HOST: 0.0.0.0
+          XDG_CACHE_HOME: /tmp/.chromium
+          XDG_CONFIG_HOME: /tmp/.chromium
+        envValueFrom: {}
+        extraConfigmapMounts: []
+        extraSecretMounts: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        grafanaProtocol: http
+        grafanaSubPath: ""
+        hostAliases: []
+        image:
+          pullPolicy: Always
+          pullSecrets: []
+          registry: docker.io
+          repository: grafana/grafana-image-renderer
+          sha: ""
+          tag: latest
+        networkPolicy:
+          extraIngressSelectors: []
+          limitEgress: false
+          limitIngress: true
+        nodeSelector: {}
+        podAnnotations: {}
+        podPortName: http
+        priorityClassName: ""
+        renderingCallbackURL: ""
+        replicas: 1
+        resources: {}
+        revisionHistoryLimit: 10
+        securityContext: {}
+        serverURL: ""
+        service:
+          appProtocol: ""
+          enabled: true
+          port: 8081
+          portName: http
+          targetPort: 8081
+        serviceAccountName: ""
+        serviceMonitor:
+          enabled: false
+          interval: 1m
+          labels: {}
+          path: /metrics
+          relabelings: []
+          scheme: http
+          scrapeTimeout: 30s
+          targetLabels: []
+          tlsConfig: {}
+        tolerations: []
+      ingress:
+        annotations: {}
+        enabled: false
+        extraPaths: []
+        hosts:
+        - chart-example.local
+        labels: {}
+        path: /
+        pathType: Prefix
+        tls: []
+      initChownData:
+        enabled: true
+        image:
+          pullPolicy: IfNotPresent
+          registry: docker.io
+          repository: library/busybox
+          sha: ""
+          tag: 1.31.1
+        resources: {}
+        securityContext:
+          capabilities:
+            add:
+            - CHOWN
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: false
+          runAsUser: 0
+          seccompProfile:
+            type: RuntimeDefault
+      ldap:
+        config: ""
+        enabled: false
+        existingSecret: ""
+      lifecycleHooks: {}
+      livenessProbe:
+        failureThreshold: 10
+        httpGet:
+          path: /api/health
+          port: 3000
+        initialDelaySeconds: 60
+        timeoutSeconds: 30
+      namespaceOverride: ""
+      networkPolicy:
+        allowExternal: true
+        egress:
+          blockDNSResolution: false
+          enabled: false
+          ports: []
+          to: []
+        enabled: false
+        explicitNamespacesSelector: {}
+        ingress: true
+      nodeSelector: {}
+      notifiers: {}
+      persistence:
+        accessModes:
+        - ReadWriteOnce
+        disableWarning: false
+        enabled: true
+        existingClaim: grafana-data-pvc
+        extraPvcLabels: {}
+        finalizers:
+        - kubernetes.io/pvc-protection
+        inMemory:
+          enabled: false
+        lookupVolumeName: true
+        size: 10Gi
+        type: pvc
+        volumeName: ""
+      plugins: []
+      podDisruptionBudget: {}
+      podPortName: grafana
+      rbac:
+        create: true
+        extraClusterRoleRules: []
+        extraRoleRules: []
+        namespaced: false
+        pspEnabled: false
+        pspUseAppArmor: false
+      readinessProbe:
+        httpGet:
+          path: /api/health
+          port: 3000
+      replicas: 1
+      resources: {}
+      revisionHistoryLimit: 10
+      route:
+        main:
+          additionalRules: []
+          annotations: {}
+          apiVersion: gateway.networking.k8s.io/v1
+          enabled: false
+          filters: []
+          hostnames: []
+          httpsRedirect: false
+          kind: HTTPRoute
+          labels: {}
+          matches:
+          - path:
+              type: PathPrefix
+              value: /
+          parentRefs: []
+      securityContext:
+        fsGroup: 472
+        runAsGroup: 472
+        runAsNonRoot: true
+        runAsUser: 472
+      service:
+        annotations: {}
+        appProtocol: ""
+        enabled: true
+        ipFamilies: []
+        ipFamilyPolicy: ""
+        labels: {}
+        loadBalancerClass: ""
+        loadBalancerIP: ""
+        loadBalancerSourceRanges: []
+        port: 80
+        portName: service
+        sessionAffinity: ""
+        targetPort: 3000
+        type: ClusterIP
+      serviceAccount:
+        automountServiceAccountToken: false
+        create: true
+        labels: {}
+      serviceMonitor:
+        basicAuth: {}
+        enabled: false
+        interval: 30s
+        labels: {}
+        metricRelabelings: []
+        path: /metrics
+        relabelings: []
+        scheme: http
+        scrapeTimeout: 30s
+        targetLabels: []
+        tlsConfig: {}
+      shareProcessNamespace: false
+      sidecar:
+        alerts:
+          enabled: false
+          env: {}
+          envValueFrom: {}
+          extraMounts: []
+          initAlerts: false
+          label: grafana_alert
+          labelValue: ""
+          reloadURL: http://localhost:3000/api/admin/provisioning/alerting/reload
+          resource: both
+          resourceName: ""
+          sizeLimit: ""
+          skipReload: false
+          watchMethod: WATCH
+        dashboards:
+          SCProvider: true
+          enabled: false
+          env: {}
+          envValueFrom: {}
+          extraMounts: []
+          folder: /tmp/dashboards
+          initDashboards: false
+          label: grafana_dashboard
+          labelValue: ""
+          provider:
+            allowUiUpdates: false
+            disableDelete: false
+            folder: ""
+            folderUid: ""
+            foldersFromFilesStructure: false
+            name: sidecarProvider
+            orgid: 1
+            type: file
+          reloadURL: http://localhost:3000/api/admin/provisioning/dashboards/reload
+          resource: both
+          resourceName: ""
+          sizeLimit: ""
+          skipReload: false
+          watchMethod: WATCH
+        datasources:
+          enabled: false
+          env: {}
+          envValueFrom: {}
+          extraMounts: []
+          initDatasources: false
+          label: grafana_datasource
+          labelValue: ""
+          reloadURL: http://localhost:3000/api/admin/provisioning/datasources/reload
+          resource: both
+          resourceName: ""
+          sizeLimit: ""
+          skipReload: false
+          watchMethod: WATCH
+        enableUniqueFilenames: false
+        image:
+          registry: quay.io
+          repository: kiwigrid/k8s-sidecar
+          sha: ""
+          tag: 2.1.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe: {}
+        notifiers:
+          enabled: false
+          env: {}
+          extraMounts: []
+          initNotifiers: false
+          label: grafana_notifier
+          labelValue: ""
+          reloadURL: http://localhost:3000/api/admin/provisioning/notifications/reload
+          resource: both
+          resourceName: ""
+          sizeLimit: ""
+          skipReload: false
+          watchMethod: WATCH
+        plugins:
+          enabled: false
+          env: {}
+          extraMounts: []
+          initPlugins: false
+          label: grafana_plugin
+          labelValue: ""
+          reloadURL: http://localhost:3000/api/admin/provisioning/plugins/reload
+          resource: both
+          resourceName: ""
+          sizeLimit: ""
+          skipReload: false
+          watchMethod: WATCH
+        readinessProbe: {}
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      smtp:
+        existingSecret: ""
+        passwordKey: password
+        userKey: user
+      testFramework:
+        containerSecurityContext: {}
+        enabled: true
+        image:
+          registry: docker.io
+          repository: bats/bats
+          tag: v1.4.1
+        imagePullPolicy: IfNotPresent
+        resources: {}
+        securityContext: {}
+      tolerations: []
+      topologySpreadConstraints: []
+      useStatefulSet: false
+    loki:
+      adminApi:
+        affinity: {}
+        annotations: {}
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env: []
+        extraArgs: {}
+        extraContainers: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        initContainers: []
+        labels: {}
+        nodeSelector: {}
+        podSecurityContext:
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+          initialDelaySeconds: 45
+        replicas: 1
+        resources: {}
+        service:
+          annotations: {}
+          labels: {}
+        strategy:
+          type: RollingUpdate
+        terminationGracePeriodSeconds: 60
+        tolerations: []
+        topologySpreadConstraints: []
+      auth_enabled: false
+      backend:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: backend
+              topologyKey: kubernetes.io/hostname
+        annotations: {}
+        autoscaling:
+          behavior: {}
+          enabled: false
+          maxReplicas: 6
+          minReplicas: 3
+          targetCPUUtilizationPercentage: 60
+        dnsConfig: {}
+        extraArgs: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        image: {}
+        initContainers: []
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          dataVolumeParameters:
+            emptyDir: {}
+          enableStatefulSetAutoDeletePVC: true
+          size: 10Gi
+          volumeClaimsEnabled: true
+        podAnnotations: {}
+        podLabels: {}
+        podManagementPolicy: Parallel
+        replicas: 0
+        resources: {}
+        selectorLabels: {}
+        service:
+          annotations: {}
+          labels: {}
+        targetModule: backend
+        terminationGracePeriodSeconds: 300
+        tolerations: []
+        topologySpreadConstraints: []
+      bloomBuilder:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: bloom-builder
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        autoscaling:
+          behavior:
+            enabled: false
+            scaleDown: {}
+            scaleUp: {}
+          customMetrics: []
+          enabled: false
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 60
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        nodeSelector: {}
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+      bloomGateway:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: bloom-gateway
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        livenessProbe: {}
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          claims:
+          - name: data
+            size: 10Gi
+            storageClass: null
+          enableStatefulSetAutoDeletePVC: false
+          enabled: false
+          whenDeleted: Retain
+          whenScaled: Retain
+        podAnnotations: {}
+        podLabels: {}
+        readinessProbe: {}
+        replicas: 0
+        resources: {}
+        serviceAccount:
+          annotations: {}
+          automountServiceAccountToken: true
+          create: false
+          imagePullSecrets: []
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+      bloomPlanner:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: bloom-planner
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        livenessProbe: {}
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          claims:
+          - name: data
+            size: 10Gi
+            storageClass: null
+          enableStatefulSetAutoDeletePVC: false
+          enabled: false
+          whenDeleted: Retain
+          whenScaled: Retain
+        podAnnotations: {}
+        podLabels: {}
+        readinessProbe: {}
+        replicas: 0
+        resources: {}
+        serviceAccount:
+          annotations: {}
+          automountServiceAccountToken: true
+          create: false
+          imagePullSecrets: []
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+      chunks-cache:
+        enabled: false
+      chunksCache:
+        affinity: {}
+        allocatedMemory: 8192
+        annotations: {}
+        batchSize: 4
+        connectionLimit: 16384
+        defaultValidity: 0s
+        enabled: true
+        extraArgs: {}
+        extraContainers: []
+        extraExtendedOptions: ""
+        extraVolumeMounts: []
+        extraVolumes: []
+        initContainers: []
+        maxItemMemory: 5
+        nodeSelector: {}
+        parallelism: 5
+        persistence:
+          enabled: false
+          mountPath: /data
+          storageSize: 10G
+        podAnnotations: {}
+        podDisruptionBudget:
+          maxUnavailable: 1
+        podLabels: {}
+        podManagementPolicy: Parallel
+        port: 11211
+        replicas: 1
+        service:
+          annotations: {}
+          labels: {}
+        statefulStrategy:
+          type: RollingUpdate
+        terminationGracePeriodSeconds: 60
+        timeout: 2000ms
+        tolerations: []
+        topologySpreadConstraints: []
+        writebackBuffer: 500000
+        writebackParallelism: 1
+        writebackSizeLimit: 500MB
+      compactor:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: compactor
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        livenessProbe: {}
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          claims:
+          - name: data
+            size: 10Gi
+            storageClass: null
+          enableStatefulSetAutoDeletePVC: false
+          enabled: false
+          size: 10Gi
+          whenDeleted: Retain
+          whenScaled: Retain
+        podAnnotations: {}
+        podLabels: {}
+        readinessProbe: {}
+        replicas: 0
+        resources: {}
+        serviceAccount:
+          annotations: {}
+          automountServiceAccountToken: true
+          create: false
+          imagePullSecrets: []
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+      deploymentMode: SingleBinary
+      distributor:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: distributor
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        autoscaling:
+          behavior:
+            enabled: false
+            scaleDown: {}
+            scaleUp: {}
+          customMetrics: []
+          enabled: false
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 60
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        maxSurge: 0
+        nodeSelector: {}
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+        topologySpreadConstraints: []
+      enterprise:
+        adminApi:
+          enabled: true
+        adminToken:
+          additionalNamespaces: []
+        config: |
+          {{- if .Values.enterprise.adminApi.enabled }}
+          admin_client:
+            {{ include "enterprise-logs.adminAPIStorageConfig" . | nindent 2 }}
+          {{ end }}
+          auth:
+            type: {{ .Values.enterprise.adminApi.enabled | ternary "enterprise" "trust" }}
+          auth_enabled: {{ .Values.loki.auth_enabled }}
+          cluster_name: {{ include "loki.clusterName" . }}
+          license:
+            path: /etc/loki/license/license.jwt
+        enabled: false
+        externalConfigName: ""
+        gelGateway: true
+        image:
+          pullPolicy: IfNotPresent
+          registry: docker.io
+          repository: grafana/enterprise-logs
+          tag: 3.3.0
+        license:
+          contents: NOTAVALIDLICENSE
+        provisioner:
+          additionalTenants: []
+          affinity: {}
+          annotations: {}
+          enabled: true
+          env: []
+          extraVolumeMounts: []
+          image:
+            pullPolicy: IfNotPresent
+            registry: docker.io
+            repository: grafana/enterprise-logs-provisioner
+          labels: {}
+          nodeSelector: {}
+          securityContext:
+            fsGroup: 10001
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+          tolerations: []
+        tokengen:
+          affinity: {}
+          annotations: {}
+          enabled: true
+          env: []
+          extraArgs: []
+          extraEnvFrom: []
+          extraVolumeMounts: []
+          extraVolumes: []
+          labels: {}
+          nodeSelector: {}
+          priorityClassName: ""
+          securityContext:
+            fsGroup: 10001
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+          targetModule: tokengen
+          tolerations: []
+        useExternalLicense: false
+        version: 3.1.1
+      enterpriseGateway:
+        affinity: {}
+        annotations: {}
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env: []
+        extraArgs: {}
+        extraContainers: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        initContainers: []
+        labels: {}
+        nodeSelector: {}
+        podSecurityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+          initialDelaySeconds: 45
+        replicas: 1
+        resources: {}
+        service:
+          annotations: {}
+          labels: {}
+          type: ClusterIP
+        strategy:
+          type: RollingUpdate
+        terminationGracePeriodSeconds: 60
+        tolerations: []
+        topologySpreadConstraints: []
+        useDefaultProxyURLs: true
+      extraObjects: []
+      gateway:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: gateway
+              topologyKey: kubernetes.io/hostname
+        annotations: {}
+        autoscaling:
+          behavior: {}
+          enabled: false
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 60
+        basicAuth:
+          enabled: false
+          htpasswd: |-
+            {{ if .Values.loki.tenants }}
+
+
+              {{- range $t := .Values.loki.tenants }}
+            {{ htpasswd (required "All tenants must have a 'name' set" $t.name) (required "All tenants must have a 'password' set" $t.password) }}
+
+
+              {{- end }}
+            {{ else }} {{ htpasswd (required "'gateway.basicAuth.username' is required" .Values.gateway.basicAuth.username) (required "'gateway.basicAuth.password' is required" .Values.gateway.basicAuth.password) }} {{ end }}
+        containerPort: 8080
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        deploymentStrategy:
+          type: RollingUpdate
+        dnsConfig: {}
+        enabled: false
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        image:
+          pullPolicy: IfNotPresent
+          registry: docker.io
+          repository: nginxinc/nginx-unprivileged
+          tag: 1.27-alpine
+        ingress:
+          annotations: {}
+          enabled: false
+          hosts:
+          - host: gateway.loki.example.com
+            paths:
+            - path: /
+          ingressClassName: ""
+          labels: {}
+          tls:
+          - hosts:
+            - gateway.loki.example.com
+            secretName: loki-gateway-tls
+        lifecycle: {}
+        nginxConfig:
+          clientMaxBodySize: 4M
+          enableIPv6: true
+          file: |
+            {{- include "loki.nginxFile" . | indent 2 -}}
+          httpSnippet: '{{ if .Values.loki.tenants }}proxy_set_header X-Scope-OrgID $remote_user;{{
+            end }}'
+          logFormat: |-
+            main '$remote_addr - $remote_user [$time_local]  $status '
+                    '"$request" $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+          resolver: ""
+          schema: http
+          serverSnippet: ""
+          ssl: false
+        nodeSelector: {}
+        podAnnotations: {}
+        podLabels: {}
+        podSecurityContext:
+          fsGroup: 101
+          runAsGroup: 101
+          runAsNonRoot: true
+          runAsUser: 101
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http-metrics
+          initialDelaySeconds: 15
+          timeoutSeconds: 1
+        replicas: 1
+        resources: {}
+        service:
+          annotations: {}
+          labels: {}
+          port: 80
+          type: ClusterIP
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+        topologySpreadConstraints: []
+        verboseLogging: true
+      global:
+        clusterDomain: cluster.local
+        dnsNamespace: kube-system
+        dnsService: kube-dns
+        image: {}
+      imagePullSecrets: []
+      indexGateway:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: index-gateway
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        joinMemberlist: true
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          enableStatefulSetAutoDeletePVC: false
+          enabled: false
+          inMemory: false
+          size: 10Gi
+          whenDeleted: Retain
+          whenScaled: Retain
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 300
+        tolerations: []
+        topologySpreadConstraints: []
+        updateStrategy:
+          type: RollingUpdate
+      ingester:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: ingester
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        autoscaling:
+          behavior:
+            enabled: false
+            scaleDown: {}
+            scaleUp: {}
+          customMetrics: []
+          enabled: false
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 60
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        lifecycle: {}
+        livenessProbe: {}
+        maxUnavailable: 1
+        nodeSelector: {}
+        persistence:
+          claims:
+          - name: data
+            size: 10Gi
+            storageClass: null
+          enableStatefulSetAutoDeletePVC: false
+          enabled: false
+          inMemory: false
+          whenDeleted: Retain
+          whenScaled: Retain
+        podAnnotations: {}
+        podLabels: {}
+        readinessProbe: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 300
+        tolerations: []
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: ingester
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+        updateStrategy:
+          type: RollingUpdate
+        zoneAwareReplication:
+          enabled: true
+          maxUnavailablePct: 33
+          migration:
+            enabled: false
+            excludeDefaultZone: false
+            readPath: false
+            writePath: false
+          zoneA:
+            annotations: {}
+            extraAffinity: {}
+            podAnnotations: {}
+          zoneB:
+            annotations: {}
+            extraAffinity: {}
+            podAnnotations: {}
+          zoneC:
+            annotations: {}
+            extraAffinity: {}
+            podAnnotations: {}
+      ingress:
+        annotations: {}
+        enabled: false
+        hosts:
+        - loki.example.com
+        ingressClassName: ""
+        labels: {}
+        paths:
+          distributor:
+          - /api/prom/push
+          - /loki/api/v1/push
+          - /otlp/v1/logs
+          queryFrontend:
+          - /api/prom/query
+          - /api/prom/label
+          - /api/prom/series
+          - /api/prom/tail
+          - /loki/api/v1/query
+          - /loki/api/v1/query_range
+          - /loki/api/v1/tail
+          - /loki/api/v1/label
+          - /loki/api/v1/labels
+          - /loki/api/v1/series
+          - /loki/api/v1/index/stats
+          - /loki/api/v1/index/volume
+          - /loki/api/v1/index/volume_range
+          - /loki/api/v1/format_query
+          - /loki/api/v1/detected_field
+          - /loki/api/v1/detected_fields
+          - /loki/api/v1/detected_labels
+          - /loki/api/v1/patterns
+          ruler:
+          - /api/prom/rules
+          - /api/prom/api/v1/rules
+          - /api/prom/api/v1/alerts
+          - /loki/api/v1/rules
+          - /prometheus/api/v1/rules
+          - /prometheus/api/v1/alerts
+        tls: []
+      kubectlImage:
+        pullPolicy: IfNotPresent
+        registry: docker.io
+        repository: bitnami/kubectl
+      loki:
+        analytics: {}
+        annotations: {}
+        auth_enabled: false
+        bloom_build:
+          builder:
+            planner_address: '{{ include "loki.bloomPlannerAddress" . }}'
+          enabled: false
+        bloom_gateway:
+          client:
+            addresses: '{{ include "loki.bloomGatewayAddresses" . }}'
+          enabled: false
+        commonConfig:
+          compactor_address: '{{ include "loki.compactorAddress" . }}'
+          path_prefix: /var/loki
+          replication_factor: 1
+        compactor: {}
+        config: |
+          {{- if .Values.enterprise.enabled}}
+          {{- tpl .Values.enterprise.config . }}
+          {{- else }}
+          auth_enabled: {{ .Values.loki.auth_enabled }}
+          {{- end }}
+
+          {{- with .Values.loki.server }}
+          server:
+            {{- toYaml . | nindent 2}}
+          {{- end}}
+
+          pattern_ingester:
+            enabled: {{ .Values.loki.pattern_ingester.enabled }}
+
+          memberlist:
+          {{- if .Values.loki.memberlistConfig }}
+            {{- toYaml .Values.loki.memberlistConfig | nindent 2 }}
+          {{- else }}
+          {{- if .Values.loki.extraMemberlistConfig}}
+          {{- toYaml .Values.loki.extraMemberlistConfig | nindent 2}}
+          {{- end }}
+            join_members:
+              - {{ include "loki.memberlist" . }}
+              {{- with .Values.migrate.fromDistributed }}
+              {{- if .enabled }}
+              - {{ .memberlistService }}
+              {{- end }}
+              {{- end }}
+          {{- end }}
+
+          {{- with .Values.loki.ingester }}
+          ingester:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- if .Values.loki.commonConfig}}
+          common:
+          {{- toYaml .Values.loki.commonConfig | nindent 2}}
+            storage:
+            {{- include "loki.commonStorageConfig" . | nindent 4}}
+          {{- end}}
+
+          {{- with .Values.loki.limits_config }}
+          limits_config:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          runtime_config:
+            file: /etc/loki/runtime-config/runtime-config.yaml
+
+          {{- with .Values.chunksCache }}
+          {{- if .enabled }}
+          chunk_store_config:
+            chunk_cache_config:
+              default_validity: {{ .defaultValidity }}
+              background:
+                writeback_goroutines: {{ .writebackParallelism }}
+                writeback_buffer: {{ .writebackBuffer }}
+                writeback_size_limit: {{ .writebackSizeLimit }}
+              memcached:
+                batch_size: {{ .batchSize }}
+                parallelism: {{ .parallelism }}
+              memcached_client:
+                addresses: dnssrvnoa+_memcached-client._tcp.{{ template "loki.fullname" $ }}-chunks-cache.{{ $.Release.Namespace }}.svc
+                consistent_hash: true
+                timeout: {{ .timeout }}
+                max_idle_conns: 72
+          {{- end }}
+          {{- end }}
+
+          {{- if .Values.loki.schemaConfig }}
+          schema_config:
+          {{- toYaml .Values.loki.schemaConfig | nindent 2}}
+          {{- end }}
+
+          {{- if .Values.loki.useTestSchema }}
+          schema_config:
+          {{- toYaml .Values.loki.testSchemaConfig | nindent 2}}
+          {{- end }}
+
+          {{ include "loki.rulerConfig" . }}
+
+          {{- if or .Values.tableManager.retention_deletes_enabled .Values.tableManager.retention_period }}
+          table_manager:
+            retention_deletes_enabled: {{ .Values.tableManager.retention_deletes_enabled }}
+            retention_period: {{ .Values.tableManager.retention_period }}
+          {{- end }}
+
+          query_range:
+            align_queries_with_step: true
+            {{- with .Values.loki.query_range }}
+            {{- tpl (. | toYaml) $ | nindent 2 }}
+            {{- end }}
+            {{- if .Values.resultsCache.enabled }}
+            {{- with .Values.resultsCache }}
+            cache_results: true
+            results_cache:
+              cache:
+                default_validity: {{ .defaultValidity }}
+                background:
+                  writeback_goroutines: {{ .writebackParallelism }}
+                  writeback_buffer: {{ .writebackBuffer }}
+                  writeback_size_limit: {{ .writebackSizeLimit }}
+                memcached_client:
+                  consistent_hash: true
+                  addresses: dnssrvnoa+_memcached-client._tcp.{{ template "loki.fullname" $ }}-results-cache.{{ $.Release.Namespace }}.svc
+                  timeout: {{ .timeout }}
+                  update_interval: 1m
+            {{- end }}
+            {{- end }}
+
+          {{- with .Values.loki.storage_config }}
+          storage_config:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.query_scheduler }}
+          query_scheduler:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.compactor }}
+          compactor:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.analytics }}
+          analytics:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.querier }}
+          querier:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.index_gateway }}
+          index_gateway:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.frontend }}
+          frontend:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.frontend_worker }}
+          frontend_worker:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.distributor }}
+          distributor:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          tracing:
+            enabled: {{ .Values.loki.tracing.enabled }}
+
+          {{- with .Values.loki.bloom_build }}
+          bloom_build:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+
+          {{- with .Values.loki.bloom_gateway }}
+          bloom_gateway:
+            {{- tpl (. | toYaml) $ | nindent 4 }}
+          {{- end }}
+        configObjectName: '{{ include "loki.name" . }}'
+        configStorageType: ConfigMap
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        distributor: {}
+        enableServiceLinks: true
+        extraMemberlistConfig: {}
+        frontend:
+          scheduler_address: '{{ include "loki.querySchedulerAddress" . }}'
+          tail_proxy_url: '{{ include "loki.querierAddress" . }}'
+        frontend_worker:
+          scheduler_address: '{{ include "loki.querySchedulerAddress" . }}'
+        generatedConfigObjectName: '{{ include "loki.name" . }}'
+        image:
+          pullPolicy: IfNotPresent
+          registry: docker.io
+          repository: grafana/loki
+          tag: 3.3.0
+        index_gateway:
+          mode: simple
+        ingester: {}
+        limits_config:
+          max_cache_freshness_per_query: 10m
+          query_timeout: 300s
+          reject_old_samples: true
+          reject_old_samples_max_age: 168h
+          split_queries_by_interval: 15m
+          volume_enabled: true
+        memberlistConfig: {}
+        memcached:
+          chunk_cache:
+            batch_size: 256
+            enabled: false
+            host: ""
+            parallelism: 10
+            service: memcached-client
+          results_cache:
+            default_validity: 12h
+            enabled: false
+            host: ""
+            service: memcached-client
+            timeout: 500ms
+        pattern_ingester:
+          enabled: false
+        podAnnotations: {}
+        podLabels: {}
+        podSecurityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+        querier: {}
+        query_range: {}
+        query_scheduler: {}
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http-metrics
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
+        revisionHistoryLimit: 10
+        rulerConfig: {}
+        runtimeConfig: {}
+        schemaConfig:
+          configs:
+          - from: "2024-04-01"
+            index:
+              period: 24h
+              prefix: loki_index_
+            object_store: filesystem
+            schema: v13
+            store: tsdb
+        server:
+          grpc_listen_port: 9095
+          http_listen_port: 3100
+          http_server_read_timeout: 600s
+          http_server_write_timeout: 600s
+        serviceAnnotations: {}
+        serviceLabels: {}
+        storage:
+          azure:
+            useFederatedToken: false
+            useManagedIdentity: false
+          filesystem:
+            admin_api_directory: /var/loki/admin
+            chunks_directory: /var/loki/chunks
+            rules_directory: /var/loki/rules
+          gcs:
+            chunkBufferSize: 0
+            enableHttp2: true
+            requestTimeout: 0s
+          s3:
+            backoff_config: {}
+            disable_dualstack: false
+            http_config: {}
+            insecure: false
+            s3ForcePathStyle: false
+          swift: {}
+          type: filesystem
+        storage_config:
+          bloom_shipper:
+            working_directory: /var/loki/data/bloomshipper
+          boltdb_shipper:
+            index_gateway_client:
+              server_address: '{{ include "loki.indexGatewayAddress" . }}'
+          hedging:
+            at: 250ms
+            max_per_second: 20
+            up_to: 3
+          tsdb_shipper:
+            index_gateway_client:
+              server_address: '{{ include "loki.indexGatewayAddress" . }}'
+        structuredConfig: {}
+        tenants: []
+        testSchemaConfig:
+          configs:
+          - from: "2024-04-01"
+            index:
+              period: 24h
+              prefix: index_
+            object_store: '{{ include "loki.testSchemaObjectStore" . }}'
+            schema: v13
+            store: tsdb
+        tracing:
+          enabled: false
+        useTestSchema: false
+      loki-canary:
+        enabled: false
+      lokiCanary:
+        annotations: {}
+        dnsConfig: {}
+        enabled: true
+        extraArgs: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        image:
+          pullPolicy: IfNotPresent
+          registry: docker.io
+          repository: grafana/loki-canary
+        labelname: pod
+        nodeSelector: {}
+        podLabels: {}
+        push: true
+        resources: {}
+        service:
+          annotations: {}
+          labels: {}
+        tolerations: []
+        updateStrategy:
+          rollingUpdate:
+            maxUnavailable: 1
+          type: RollingUpdate
+      memberlist:
+        service:
+          annotations: {}
+          publishNotReadyAddresses: false
+      memcached:
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        image:
+          pullPolicy: IfNotPresent
+          repository: memcached
+          tag: 1.6.32-alpine
+        podSecurityContext:
+          fsGroup: 11211
+          runAsGroup: 11211
+          runAsNonRoot: true
+          runAsUser: 11211
+      memcachedExporter:
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        enabled: true
+        extraArgs: {}
+        image:
+          pullPolicy: IfNotPresent
+          repository: prom/memcached-exporter
+          tag: v0.15.0
+        resources:
+          limits: {}
+          requests: {}
+      migrate:
+        fromDistributed:
+          enabled: false
+          memberlistService: ""
+      minio:
+        buckets:
+        - name: chunks
+          policy: none
+          purge: false
+        - name: ruler
+          policy: none
+          purge: false
+        - name: admin
+          policy: none
+          purge: false
+        drivesPerNode: 2
+        enabled: false
+        persistence:
+          annotations: {}
+          size: 5Gi
+        replicas: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        rootPassword: "" # TODO(secret): chart default literal redacted (was a placeholder value, not a
+          # live secret). loki.minio.enabled is false below so this is currently inert -- if
+          # minio is ever enabled, set this via a Secret instead of a literal value.
+        rootUser: enterprise-logs
+      monitoring:
+        dashboards:
+          annotations: {}
+          enabled: false
+          labels:
+            grafana_dashboard: "1"
+        rules:
+          additionalGroups: []
+          additionalRuleLabels: {}
+          alerting: true
+          annotations: {}
+          disabled: {}
+          enabled: false
+          labels: {}
+        selfMonitoring:
+          enabled: false
+          grafanaAgent:
+            annotations: {}
+            enableConfigReadAPI: false
+            installOperator: false
+            labels: {}
+            resources: {}
+            tolerations: []
+          logsInstance:
+            annotations: {}
+            labels: {}
+          podLogs:
+            additionalPipelineStages: []
+            annotations: {}
+            apiVersion: monitoring.grafana.com/v1alpha1
+            labels: {}
+            relabelings: []
+          tenant:
+            name: self-monitoring
+            secretNamespace: '{{ .Release.Namespace }}'
+        serviceMonitor:
+          annotations: {}
+          enabled: false
+          interval: 15s
+          labels: {}
+          metricRelabelings: []
+          metricsInstance:
+            annotations: {}
+            enabled: true
+            labels: {}
+          namespaceSelector: {}
+          relabelings: []
+          scheme: http
+      networkPolicy:
+        alertmanager:
+          namespaceSelector: {}
+          podSelector: {}
+          port: 9093
+        discovery:
+          namespaceSelector: {}
+          podSelector: {}
+        egressKubeApiserver:
+          enabled: false
+        egressWorld:
+          enabled: false
+        enabled: false
+        externalStorage:
+          cidrs: []
+          ports: []
+        flavor: kubernetes
+        ingress:
+          namespaceSelector: {}
+          podSelector: {}
+        metrics:
+          cidrs: []
+          namespaceSelector: {}
+          podSelector: {}
+      patternIngester:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: pattern-ingester
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        livenessProbe: {}
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          claims:
+          - name: data
+            size: 10Gi
+            storageClass: null
+          enableStatefulSetAutoDeletePVC: false
+          enabled: false
+          size: 10Gi
+          whenDeleted: Retain
+          whenScaled: Retain
+        podAnnotations: {}
+        podLabels: {}
+        readinessProbe: {}
+        replicas: 0
+        resources: {}
+        serviceAccount:
+          annotations: {}
+          automountServiceAccountToken: true
+          create: false
+          imagePullSecrets: []
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+        topologySpreadConstraints: []
+      querier:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: querier
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        autoscaling:
+          behavior:
+            enabled: false
+            scaleDown: {}
+            scaleUp: {}
+          customMetrics: []
+          enabled: false
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 60
+        dnsConfig: {}
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        maxSurge: 0
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          enabled: false
+          size: 10Gi
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/component: querier
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+      queryFrontend:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: query-frontend
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        autoscaling:
+          behavior:
+            enabled: false
+            scaleDown: {}
+            scaleUp: {}
+          customMetrics: []
+          enabled: false
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 60
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        nodeSelector: {}
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+        topologySpreadConstraints: []
+      queryScheduler:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: query-scheduler
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        maxUnavailable: 1
+        nodeSelector: {}
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+        topologySpreadConstraints: []
+      rbac:
+        namespaced: false
+        pspAnnotations: {}
+        pspEnabled: false
+        sccEnabled: false
+      read:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: read
+              topologyKey: kubernetes.io/hostname
+        annotations: {}
+        autoscaling:
+          behavior: {}
+          enabled: false
+          maxReplicas: 6
+          minReplicas: 2
+          targetCPUUtilizationPercentage: 60
+        dnsConfig: {}
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        image: {}
+        legacyReadTarget: false
+        lifecycle: {}
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          enableStatefulSetAutoDeletePVC: true
+          size: 10Gi
+        podAnnotations: {}
+        podLabels: {}
+        podManagementPolicy: Parallel
+        replicas: 0
+        resources: {}
+        selectorLabels: {}
+        service:
+          annotations: {}
+          labels: {}
+        targetModule: read
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+        topologySpreadConstraints: []
+      results-cache:
+        enabled: false
+      resultsCache:
+        affinity: {}
+        allocatedMemory: 1024
+        annotations: {}
+        connectionLimit: 16384
+        defaultValidity: 12h
+        enabled: true
+        extraArgs: {}
+        extraContainers: []
+        extraExtendedOptions: ""
+        extraVolumeMounts: []
+        extraVolumes: []
+        initContainers: []
+        maxItemMemory: 5
+        nodeSelector: {}
+        persistence:
+          enabled: false
+          mountPath: /data
+          storageSize: 10G
+        podAnnotations: {}
+        podDisruptionBudget:
+          maxUnavailable: 1
+        podLabels: {}
+        podManagementPolicy: Parallel
+        port: 11211
+        replicas: 1
+        service:
+          annotations: {}
+          labels: {}
+        statefulStrategy:
+          type: RollingUpdate
+        terminationGracePeriodSeconds: 60
+        timeout: 500ms
+        tolerations: []
+        topologySpreadConstraints: []
+        writebackBuffer: 500000
+        writebackParallelism: 1
+        writebackSizeLimit: 500MB
+      rollout_operator:
+        enabled: false
+        podSecurityContext:
+          fsGroup: 10001
+          runAsGroup: 10001
+          runAsNonRoot: true
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      ruler:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: ruler
+              topologyKey: kubernetes.io/hostname
+        appProtocol:
+          grpc: ""
+        directories: {}
+        dnsConfig: {}
+        enabled: true
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        hostAliases: []
+        image: {}
+        initContainers: []
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          enabled: false
+          size: 10Gi
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        serviceAnnotations: {}
+        serviceLabels: {}
+        terminationGracePeriodSeconds: 300
+        tolerations: []
+        topologySpreadConstraints: []
+      serviceAccount:
+        annotations: {}
+        automountServiceAccountToken: true
+        create: true
+        imagePullSecrets: []
+        labels: {}
+      sidecar:
+        enableUniqueFilenames: false
+        image:
+          pullPolicy: IfNotPresent
+          repository: kiwigrid/k8s-sidecar
+          sha: ""
+          tag: 1.28.0
+        livenessProbe: {}
+        readinessProbe: {}
+        resources: {}
+        rules:
+          enabled: true
+          folder: /rules
+          label: loki_rule
+          labelValue: ""
+          logLevel: INFO
+          resource: both
+          watchClientTimeout: 60
+          watchMethod: WATCH
+          watchServerTimeout: 60
+        securityContext: {}
+        skipTlsVerify: false
+      singleBinary:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: single-binary
+              topologyKey: kubernetes.io/hostname
+        annotations: {}
+        autoscaling:
+          enabled: false
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 60
+        dnsConfig: {}
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        image: {}
+        initContainers: []
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          enableStatefulSetAutoDeletePVC: true
+          enabled: true
+          size: 10Gi
+        podAnnotations: {}
+        podLabels: {}
+        replicas: 0
+        resources: {}
+        selectorLabels: {}
+        service:
+          annotations: {}
+          labels: {}
+        targetModule: all
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+      tableManager:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: table-manager
+              topologyKey: kubernetes.io/hostname
+        annotations: {}
+        dnsConfig: {}
+        enabled: false
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        image: {}
+        nodeSelector: {}
+        podAnnotations: {}
+        podLabels: {}
+        resources: {}
+        retention_deletes_enabled: false
+        retention_period: 0
+        service:
+          annotations: {}
+          labels: {}
+        terminationGracePeriodSeconds: 30
+        tolerations: []
+      test:
+        annotations: {}
+        canaryServiceAddress: http://loki-canary:3500/metrics
+        enabled: true
+        image:
+          pullPolicy: IfNotPresent
+          registry: docker.io
+          repository: grafana/loki-helm-test
+          tag: ewelch-distributed-helm-chart-17db5ee
+        labels: {}
+        prometheusAddress: ""
+        timeout: 1m
+      write:
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: write
+              topologyKey: kubernetes.io/hostname
+        annotations: {}
+        autoscaling:
+          behavior:
+            scaleDown:
+              policies:
+              - periodSeconds: 1800
+                type: Pods
+                value: 1
+              stabilizationWindowSeconds: 3600
+            scaleUp:
+              policies:
+              - periodSeconds: 900
+                type: Pods
+                value: 1
+          enabled: false
+          maxReplicas: 6
+          minReplicas: 2
+          targetCPUUtilizationPercentage: 60
+        dnsConfig: {}
+        extraArgs: []
+        extraContainers: []
+        extraEnv: []
+        extraEnvFrom: []
+        extraVolumeClaimTemplates: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        image: {}
+        initContainers: []
+        lifecycle: {}
+        nodeSelector: {}
+        persistence:
+          annotations: {}
+          dataVolumeParameters:
+            emptyDir: {}
+          enableStatefulSetAutoDeletePVC: false
+          size: 10Gi
+          volumeClaimsEnabled: true
+        podAnnotations: {}
+        podLabels: {}
+        podManagementPolicy: Parallel
+        replicas: 0
+        resources: {}
+        selectorLabels: {}
+        service:
+          annotations: {}
+          labels: {}
+        targetModule: write
+        terminationGracePeriodSeconds: 300
+        tolerations: []
+        topologySpreadConstraints: []
+    prometheus:
+      alertRelabelConfigs: {}
+      alertmanager:
+        enabled: false
+        persistence:
+          accessModes:
+          - ReadWriteOnce
+          annotations: {}
+          emptyDir: {}
+          enabled: true
+          labels: {}
+          size: 2Gi
+        podSecurityContext:
+          fsGroup: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          runAsUser: 65534
+      commonMetaLabels: {}
+      configmapReload:
+        env: []
+        prometheus:
+          containerPort: 8080
+          containerPortName: metrics
+          containerSecurityContext: {}
+          enabled: true
+          extraArgs: {}
+          extraConfigmapMounts: []
+          extraVolumeDirs: []
+          extraVolumeMounts: []
+          image:
+            digest: ""
+            pullPolicy: IfNotPresent
+            repository: quay.io/prometheus-operator/prometheus-config-reloader
+            tag: v0.87.1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+              scheme: HTTP
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          name: configmap-reload
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+              scheme: HTTP
+            periodSeconds: 10
+          resources: {}
+          startupProbe:
+            enabled: false
+            httpGet:
+              path: /healthz
+              port: metrics
+              scheme: HTTP
+            periodSeconds: 10
+        reloadUrl: ""
+      extraManifests: []
+      extraScrapeConfigs: ""
+      forceNamespace: ""
+      global: {}
+      imagePullSecrets: []
+      kube-state-metrics:
+        affinity: {}
+        annotations: {}
+        automountServiceAccountToken: true
+        autosharding:
+          enabled: false
+        collectors:
+        - certificatesigningrequests
+        - configmaps
+        - cronjobs
+        - daemonsets
+        - deployments
+        - endpointslices
+        - horizontalpodautoscalers
+        - ingresses
+        - jobs
+        - leases
+        - limitranges
+        - mutatingwebhookconfigurations
+        - namespaces
+        - networkpolicies
+        - nodes
+        - persistentvolumeclaims
+        - persistentvolumes
+        - poddisruptionbudgets
+        - pods
+        - replicasets
+        - replicationcontrollers
+        - resourcequotas
+        - secrets
+        - services
+        - statefulsets
+        - storageclasses
+        - validatingwebhookconfigurations
+        - volumeattachments
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        containers: []
+        customLabels: {}
+        customResourceState:
+          config: {}
+          create: true
+          enabled: false
+          key: config.yaml
+          name: ""
+        dnsConfig: {}
+        dnsPolicy: ClusterFirst
+        enabled: true
+        env: []
+        extraArgs: []
+        extraManifests: []
+        global:
+          imagePullSecrets: []
+          imageRegistry: ""
+        hostNetwork: false
+        image:
+          pullPolicy: IfNotPresent
+          registry: registry.k8s.io
+          repository: kube-state-metrics/kube-state-metrics
+          sha: ""
+          tag: ""
+        imagePullSecrets: []
+        initContainers: []
+        kubeRBACProxy:
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          enabled: false
+          extraArgs: []
+          ignoreProbePaths: true
+          image:
+            pullPolicy: IfNotPresent
+            registry: quay.io
+            repository: brancz/kube-rbac-proxy
+            sha: ""
+            tag: v0.20.1
+          port: 9090
+          proxyEndpointsPort: 8888
+          resources: {}
+          volumeMounts: []
+        kubeconfig:
+          enabled: false
+        labels: {}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders: []
+            scheme: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        metricAllowlist: []
+        metricAnnotationsAllowList: []
+        metricDenylist: []
+        metricLabelsAllowlist: []
+        namespaceOverride: ""
+        namespaces: ""
+        namespacesDenylist: ""
+        networkPolicy:
+          enabled: false
+          flavor: kubernetes
+        nodeSelector: {}
+        podAnnotations: {}
+        podDisruptionBudget: {}
+        podLabels: {}
+        prometheus:
+          monitor:
+            additionalLabels: {}
+            annotations: {}
+            enabled: false
+            http:
+              bearerTokenFile: ""
+              bearerTokenSecret: {}
+              enableHttp2: false
+              honorLabels: false
+              interval: ""
+              metricRelabelings: []
+              proxyUrl: ""
+              relabelings: []
+              scheme: ""
+              scrapeTimeout: ""
+              tlsConfig: {}
+            jobLabel: ""
+            labelLimit: 0
+            labelNameLengthLimit: 0
+            labelValueLengthLimit: 0
+            metrics:
+              bearerTokenFile: ""
+              bearerTokenSecret: {}
+              enableHttp2: false
+              honorLabels: false
+              interval: ""
+              metricRelabelings: []
+              proxyUrl: ""
+              relabelings: []
+              scheme: ""
+              scrapeTimeout: ""
+              tlsConfig: {}
+            namespace: ""
+            namespaceSelector: []
+            podTargetLabels: []
+            sampleLimit: 0
+            selectorOverride: {}
+            targetLabels: []
+            targetLimit: 0
+          scrapeconfig:
+            additionalLabels: {}
+            annotations: {}
+            enableHttp2: false
+            enabled: false
+            honorLabels: true
+            jobName: kube-state-metrics
+            labelLimit: 0
+            labelNameLengthLimit: 0
+            labelValueLengthLimit: 0
+            metricRelabelings: []
+            proxyUrl: ""
+            relabelings: []
+            sampleLimit: 0
+            scheme: ""
+            scrapeInterval: ""
+            scrapeTimeout: ""
+            staticConfigLabels: {}
+            targetLimit: 0
+            tlsConfig: {}
+        prometheusScrape: true
+        rbac:
+          create: true
+          extraRules: []
+          useClusterRole: true
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders: []
+            scheme: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        releaseLabel: false
+        releaseNamespace: false
+        replicas: 1
+        resources: {}
+        revisionHistoryLimit: 10
+        securityContext:
+          enabled: true
+          fsGroup: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          runAsUser: 65534
+          seccompProfile:
+            type: RuntimeDefault
+        selectorOverride: {}
+        selfMonitor:
+          enabled: false
+        service:
+          annotations: {}
+          clusterIP: ""
+          ipDualStack:
+            enabled: false
+            ipFamilies:
+            - IPv6
+            - IPv4
+            ipFamilyPolicy: PreferDualStack
+          loadBalancerIP: ""
+          loadBalancerSourceRanges: []
+          nodePort: 0
+          port: 8080
+          type: ClusterIP
+        serviceAccount:
+          annotations: {}
+          automountServiceAccountToken: true
+          create: true
+          imagePullSecrets: []
+        startupProbe:
+          enabled: false
+          failureThreshold: 3
+          httpGet:
+            httpHeaders: []
+            scheme: http
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        tolerations: []
+        topologySpreadConstraints: []
+        verticalPodAutoscaler:
+          controlledResources: []
+          enabled: false
+          maxAllowed: {}
+          minAllowed: {}
+        volumeMounts: []
+        volumes: []
+      networkPolicy:
+        enabled: false
+      prometheus-node-exporter:
+        affinity: {}
+        commonLabels: {}
+        configmaps: []
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        daemonsetAnnotations: {}
+        dnsConfig: {}
+        enabled: true
+        endpoints: []
+        env: {}
+        extraArgs: []
+        extraHostVolumeMounts: []
+        extraInitContainers: []
+        extraManifests: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        fullnameOverride: ""
+        global:
+          imagePullSecrets: []
+          imageRegistry: ""
+        hostIPC: false
+        hostNetwork: true
+        hostPID: true
+        hostProcFsMount:
+          mountPropagation: ""
+        hostRootFsMount:
+          enabled: true
+          mountPropagation: HostToContainer
+        hostSysFsMount:
+          mountPropagation: ""
+        image:
+          digest: ""
+          pullPolicy: IfNotPresent
+          registry: quay.io
+          repository: prometheus/node-exporter
+          tag: ""
+        imagePullSecrets: []
+        kubeRBACProxy:
+          containerSecurityContext: {}
+          enableHostPort: false
+          enableProxyEndpointsHostPort: false
+          enabled: false
+          env: {}
+          extraArgs: []
+          extraVolumeMounts: []
+          image:
+            pullPolicy: IfNotPresent
+            registry: quay.io
+            repository: brancz/kube-rbac-proxy
+            sha: ""
+            tag: v0.20.1
+          port: 8100
+          portName: http
+          proxyEndpointsPort: 8888
+          resources: {}
+          tls:
+            enabled: false
+            tlsClientAuth: false
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders: []
+            scheme: http
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        nameOverride: ""
+        namespaceOverride: ""
+        networkPolicy:
+          enabled: false
+        nodeSelector:
+          kubernetes.io/os: linux
+        podAnnotations:
+          cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+        podLabels: {}
+        prometheus:
+          monitor:
+            additionalLabels: {}
+            apiVersion: ""
+            attachMetadata:
+              node: false
+            basicAuth: {}
+            enabled: false
+            interval: ""
+            jobLabel: ""
+            labelLimit: 0
+            labelNameLengthLimit: 0
+            labelValueLengthLimit: 0
+            metricRelabelings: []
+            namespace: ""
+            podTargetLabels: []
+            proxyUrl: ""
+            relabelings: []
+            sampleLimit: 0
+            scheme: http
+            scrapeTimeout: 10s
+            selectorOverride: {}
+            targetLabels: []
+            targetLimit: 0
+            tlsConfig: {}
+          podMonitor:
+            additionalLabels: {}
+            apiVersion: ""
+            attachMetadata:
+              node: false
+            authorization: {}
+            basicAuth: {}
+            bearerTokenSecret: {}
+            enableHttp2: ""
+            enabled: false
+            filterRunning: ""
+            followRedirects: ""
+            honorLabels: true
+            honorTimestamps: true
+            interval: ""
+            jobLabel: ""
+            labelLimit: 0
+            labelNameLengthLimit: 0
+            labelValueLengthLimit: 0
+            metricRelabelings: []
+            namespace: ""
+            oauth2: {}
+            params: {}
+            path: /metrics
+            podTargetLabels: []
+            proxyUrl: ""
+            relabelings: []
+            sampleLimit: 0
+            scheme: http
+            scrapeTimeout: ""
+            selectorOverride: {}
+            targetLimit: 0
+            tlsConfig: {}
+        rbac:
+          create: true
+          pspEnabled: false
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders: []
+            scheme: http
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        releaseLabel: false
+        resources: {}
+        revisionHistoryLimit: 10
+        secrets: []
+        securityContext:
+          fsGroup: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          runAsUser: 65534
+        service:
+          annotations:
+            prometheus.io/scrape: "true"
+          clusterIP: ""
+          enabled: true
+          externalTrafficPolicy: ""
+          internalTrafficPolicy: ""
+          ipDualStack:
+            enabled: false
+            ipFamilies:
+            - IPv6
+            - IPv4
+            ipFamilyPolicy: PreferDualStack
+          labels: {}
+          listenOnAllInterfaces: true
+          port: 9100
+          portName: metrics
+          servicePort: ""
+          targetPort: 9100
+          type: ClusterIP
+        serviceAccount:
+          annotations: {}
+          automountServiceAccountToken: false
+          create: true
+          imagePullSecrets: []
+        sidecarHostVolumeMounts: []
+        sidecarVolumeMount: []
+        sidecars: []
+        terminationMessageParams:
+          enabled: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        tlsSecret:
+          caItem: ""
+          certItem: tls.crt
+          enabled: false
+          keyItem: tls.key
+          secretName: prometheus-node-exporter-tls
+          volumeName: prometheus-node-exporter-tls
+        tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        updateStrategy:
+          rollingUpdate:
+            maxUnavailable: 1
+          type: RollingUpdate
+        version: ""
+        verticalPodAutoscaler:
+          controlledResources: []
+          enabled: false
+          maxAllowed: {}
+          minAllowed: {}
+      prometheus-pushgateway:
+        enabled: false
+        serviceAnnotations:
+          prometheus.io/probe: pushgateway
+      rbac:
+        create: true
+      ruleFiles: {}
+      scrapeConfigFiles: []
+      server:
+        affinity: {}
+        alertmanagers: []
+        baseURL: ""
+        clusterRoleNameOverride: ""
+        command: []
+        configFromSecret: ""
+        configMapAnnotations: {}
+        configMapOverrideName: ""
+        configPath: /etc/config/prometheus.yml
+        containerSecurityContext: {}
+        daemonSet:
+          annotations: {}
+          enabled: false
+          labels: {}
+        defaultFlagsOverride: []
+        deploymentAnnotations: {}
+        dnsConfig: {}
+        dnsPolicy: ClusterFirst
+        emptyDir:
+          medium: ""
+          sizeLimit: ""
+        enableServiceLinks: true
+        env: []
+        exemplars: {}
+        extraArgs: {}
+        extraConfigmapLabels: {}
+        extraConfigmapMounts: []
+        extraFlags:
+        - web.enable-lifecycle
+        extraHostPathMounts: []
+        extraInitContainers: []
+        extraScrapeConfigs: |
+          - job_name: 'kubernetes-service-endpoints-scrapper'
+            kubernetes_sd_configs:
+              - role: endpoints
+            relabel_configs:
+              - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+                action: keep
+                regex: true
+              - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+                action: replace
+                target_label: __metrics_path__
+                regex: (.+)
+              - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+                action: replace
+                target_label: __address__
+                regex: ([^:]+)(?::\d+)?;(\d+)
+                replacement: $1:$2
+              - action: labelmap
+                regex: __meta_kubernetes_service_label_(.+)
+              - source_labels: [__meta_kubernetes_namespace]
+                action: replace
+                target_label: kubernetes_namespace
+              - source_labels: [__meta_kubernetes_service_name]
+                action: replace
+                target_label: kubernetes_name
+        extraSecretMounts: []
+        extraVolumeMounts: []
+        extraVolumes: []
+        fullnameOverride: ""
+        global:
+          evaluation_interval: 1m
+          scrape_interval: 1m
+          scrape_timeout: 10s
+        hostAliases: []
+        hostNetwork: false
+        image:
+          digest: ""
+          pullPolicy: IfNotPresent
+          repository: quay.io/prometheus/prometheus
+          tag: ""
+        ingress:
+          annotations: {}
+          enabled: false
+          extraLabels: {}
+          extraPaths: []
+          hosts: []
+          ingressClassName: ""
+          path: /
+          pathType: Prefix
+          tls: []
+        livenessProbeFailureThreshold: 3
+        livenessProbeInitialDelay: 30
+        livenessProbePeriodSeconds: 15
+        livenessProbeSuccessThreshold: 1
+        livenessProbeTimeout: 10
+        name: server
+        nodeSelector: {}
+        otlp: {}
+        persistentVolume:
+          accessModes:
+          - ReadWriteOnce
+          annotations: {}
+          enabled: true
+          existingClaim: prometheus-data-pvc
+          labels: {}
+          mountPath: /data
+          size: 8Gi
+          statefulSetNameOverride: ""
+          subPath: ""
+        podAnnotations: {}
+        podAntiAffinity: ""
+        podAntiAffinityTopologyKey: kubernetes.io/hostname
+        podDisruptionBudget:
+          enabled: false
+        podLabels: {}
+        portName: ""
+        prefixURL: ""
+        priorityClassName: ""
+        probeHeaders: []
+        probeScheme: HTTP
+        readinessProbeFailureThreshold: 3
+        readinessProbeInitialDelay: 30
+        readinessProbePeriodSeconds: 5
+        readinessProbeSuccessThreshold: 1
+        readinessProbeTimeout: 4
+        releaseNamespace: false
+        remoteRead: []
+        remoteWrite: []
+        replicaCount: 1
+        resources: {}
+        retention: 30d
+        retentionSize: 50GB
+        revisionHistoryLimit: 10
+        route:
+          main:
+            additionalRules: []
+            annotations: {}
+            apiVersion: ""
+            enabled: false
+            filters: []
+            hostnames: []
+            httpsRedirect: false
+            kind: ""
+            labels: {}
+            matches:
+            - path:
+                type: PathPrefix
+                value: /
+            parentRefs: []
+        runtimeClassName: ""
+        securityContext:
+          fsGroup: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+          runAsUser: 65534
+        service:
+          additionalPorts: []
+          annotations: {}
+          clusterIP: ""
+          enabled: true
+          externalIPs: []
+          externalTrafficPolicy: ""
+          gRPC:
+            enabled: false
+            servicePort: 10901
+          labels: {}
+          loadBalancerClass: ""
+          loadBalancerIP: ""
+          loadBalancerSourceRanges: []
+          servicePort: 80
+          sessionAffinity: None
+          statefulsetReplica:
+            enabled: false
+            replica: 0
+          type: ClusterIP
+        sidecarContainers: {}
+        sidecarTemplateValues: {}
+        startupProbe:
+          enabled: false
+          failureThreshold: 30
+          periodSeconds: 5
+          timeoutSeconds: 10
+        statefulSet:
+          annotations: {}
+          enabled: false
+          headless:
+            annotations: {}
+            gRPC:
+              enabled: false
+              servicePort: 10901
+            labels: {}
+            servicePort: 80
+          labels: {}
+          podManagementPolicy: OrderedReady
+          pvcDeleteOnStsDelete: false
+          pvcDeleteOnStsScale: false
+        storagePath: ""
+        strategy:
+          type: Recreate
+        tcpSocketProbeEnabled: false
+        terminationGracePeriodSeconds: 300
+        tolerations: []
+        topologySpreadConstraints: []
+        tsdb: {}
+        verticalAutoscaler:
+          enabled: false
+      serverFiles:
+        alerting_rules.yml: {}
+        alerts: {}
+        prometheus.yml:
+          rule_files:
+          - /etc/config/recording_rules.yml
+          - /etc/config/alerting_rules.yml
+          - /etc/config/rules
+          - /etc/config/alerts
+          scrape_configs:
+          - job_name: prometheus
+            static_configs:
+            - targets:
+              - localhost:9090
+          - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            job_name: kubernetes-apiservers
+            kubernetes_sd_configs:
+            - role: endpoints
+            relabel_configs:
+            - action: keep
+              regex: default;kubernetes;https
+              source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_service_name
+              - __meta_kubernetes_endpoint_port_name
+            scheme: https
+            tls_config:
+              ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            job_name: kubernetes-nodes
+            kubernetes_sd_configs:
+            - role: node
+            relabel_configs:
+            - action: labelmap
+              regex: __meta_kubernetes_node_label_(.+)
+            - replacement: kubernetes.default.svc:443
+              target_label: __address__
+            - regex: (.+)
+              replacement: /api/v1/nodes/$1/proxy/metrics
+              source_labels:
+              - __meta_kubernetes_node_name
+              target_label: __metrics_path__
+            scheme: https
+            tls_config:
+              ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            job_name: kubernetes-nodes-cadvisor
+            kubernetes_sd_configs:
+            - role: node
+            relabel_configs:
+            - action: labelmap
+              regex: __meta_kubernetes_node_label_(.+)
+            - replacement: kubernetes.default.svc:443
+              target_label: __address__
+            - regex: (.+)
+              replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+              source_labels:
+              - __meta_kubernetes_node_name
+              target_label: __metrics_path__
+            scheme: https
+            tls_config:
+              ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - honor_labels: true
+            job_name: kubernetes-service-endpoints
+            kubernetes_sd_configs:
+            - role: endpoints
+            relabel_configs:
+            - action: keep
+              regex: true
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_scrape
+            - action: drop
+              regex: true
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_scrape_slow
+            - action: replace
+              regex: (https?)
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_scheme
+              target_label: __scheme__
+            - action: replace
+              regex: (.+)
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_path
+              target_label: __metrics_path__
+            - action: replace
+              regex: (.+?)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              source_labels:
+              - __address__
+              - __meta_kubernetes_service_annotation_prometheus_io_port
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_service_annotation_prometheus_io_param_(.+)
+              replacement: __param_$1
+            - action: labelmap
+              regex: __meta_kubernetes_service_label_(.+)
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_namespace
+              target_label: namespace
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_service_name
+              target_label: service
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_node_name
+              target_label: node
+          - honor_labels: true
+            job_name: kubernetes-service-endpoints-slow
+            kubernetes_sd_configs:
+            - role: endpoints
+            relabel_configs:
+            - action: keep
+              regex: true
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_scrape_slow
+            - action: replace
+              regex: (https?)
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_scheme
+              target_label: __scheme__
+            - action: replace
+              regex: (.+)
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_path
+              target_label: __metrics_path__
+            - action: replace
+              regex: (.+?)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              source_labels:
+              - __address__
+              - __meta_kubernetes_service_annotation_prometheus_io_port
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_service_annotation_prometheus_io_param_(.+)
+              replacement: __param_$1
+            - action: labelmap
+              regex: __meta_kubernetes_service_label_(.+)
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_namespace
+              target_label: namespace
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_service_name
+              target_label: service
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_node_name
+              target_label: node
+            scrape_interval: 5m
+            scrape_timeout: 30s
+          - honor_labels: true
+            job_name: prometheus-pushgateway
+            kubernetes_sd_configs:
+            - role: service
+            relabel_configs:
+            - action: keep
+              regex: pushgateway
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_probe
+          - honor_labels: true
+            job_name: kubernetes-services
+            kubernetes_sd_configs:
+            - role: service
+            metrics_path: /probe
+            params:
+              module:
+              - http_2xx
+            relabel_configs:
+            - action: keep
+              regex: true
+              source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_probe
+            - source_labels:
+              - __address__
+              target_label: __param_target
+            - replacement: blackbox
+              target_label: __address__
+            - source_labels:
+              - __param_target
+              target_label: instance
+            - action: labelmap
+              regex: __meta_kubernetes_service_label_(.+)
+            - source_labels:
+              - __meta_kubernetes_namespace
+              target_label: namespace
+            - source_labels:
+              - __meta_kubernetes_service_name
+              target_label: service
+          - honor_labels: true
+            job_name: kubernetes-pods
+            kubernetes_sd_configs:
+            - role: pod
+            relabel_configs:
+            - action: keep
+              regex: true
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_scrape
+            - action: drop
+              regex: true
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_scrape_slow
+            - action: replace
+              regex: (https?)
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_scheme
+              target_label: __scheme__
+            - action: replace
+              regex: (.+)
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_path
+              target_label: __metrics_path__
+            - action: replace
+              regex: (\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})
+              replacement: '[$2]:$1'
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_port
+              - __meta_kubernetes_pod_ip
+              target_label: __address__
+            - action: replace
+              regex: (\d+);((([0-9]+?)(\.|$)){4})
+              replacement: $2:$1
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_port
+              - __meta_kubernetes_pod_ip
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_annotation_prometheus_io_param_(.+)
+              replacement: __param_$1
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_namespace
+              target_label: namespace
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_name
+              target_label: pod
+            - action: drop
+              regex: Pending|Succeeded|Failed|Completed
+              source_labels:
+              - __meta_kubernetes_pod_phase
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_node_name
+              target_label: node
+          - honor_labels: true
+            job_name: kubernetes-pods-slow
+            kubernetes_sd_configs:
+            - role: pod
+            relabel_configs:
+            - action: keep
+              regex: true
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_scrape_slow
+            - action: replace
+              regex: (https?)
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_scheme
+              target_label: __scheme__
+            - action: replace
+              regex: (.+)
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_path
+              target_label: __metrics_path__
+            - action: replace
+              regex: (\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})
+              replacement: '[$2]:$1'
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_port
+              - __meta_kubernetes_pod_ip
+              target_label: __address__
+            - action: replace
+              regex: (\d+);((([0-9]+?)(\.|$)){4})
+              replacement: $2:$1
+              source_labels:
+              - __meta_kubernetes_pod_annotation_prometheus_io_port
+              - __meta_kubernetes_pod_ip
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_annotation_prometheus_io_param_(.+)
+              replacement: __param_$1
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_namespace
+              target_label: namespace
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_name
+              target_label: pod
+            - action: drop
+              regex: Pending|Succeeded|Failed|Completed
+              source_labels:
+              - __meta_kubernetes_pod_phase
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_node_name
+              target_label: node
+            scrape_interval: 5m
+            scrape_timeout: 30s
+        recording_rules.yml: {}
+        rules: {}
+      serviceAccounts:
+        server:
+          annotations: {}
+          create: true
+          name: ""
+    promtail:
+      affinity: {}
+      annotations: {}
+      automountServiceAccountToken: true
+      config:
+        clients:
+        - url: http://metrics-loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+        enableTracing: false
+        enabled: true
+        file: |
+          server:
+            log_level: {{ .Values.config.logLevel }}
+            log_format: {{ .Values.config.logFormat }}
+            http_listen_port: {{ .Values.config.serverPort }}
+            {{- with .Values.httpPathPrefix }}
+            http_path_prefix: {{ . }}
+            {{- end }}
+            {{- tpl .Values.config.snippets.extraServerConfigs . | nindent 2 }}
+
+          clients:
+            {{- tpl (toYaml .Values.config.clients) . | nindent 2 }}
+
+          positions:
+            {{- tpl (toYaml .Values.config.positions) . | nindent 2 }}
+
+          scrape_configs:
+            {{- tpl .Values.config.snippets.scrapeConfigs . | nindent 2 }}
+            {{- tpl .Values.config.snippets.extraScrapeConfigs . | nindent 2 }}
+
+          limits_config:
+            {{- tpl .Values.config.snippets.extraLimitsConfig . | nindent 2 }}
+
+          tracing:
+            enabled: {{ .Values.config.enableTracing }}
+        logFormat: logfmt
+        logLevel: info
+        positions:
+          filename: /run/promtail/positions.yaml
+        serverPort: 3101
+        snippets:
+          addScrapeJobLabel: false
+          common:
+          - action: replace
+            source_labels:
+            - __meta_kubernetes_pod_node_name
+            target_label: node_name
+          - action: replace
+            source_labels:
+            - __meta_kubernetes_namespace
+            target_label: namespace
+          - action: replace
+            replacement: $1
+            separator: /
+            source_labels:
+            - namespace
+            - app
+            target_label: job
+          - action: replace
+            source_labels:
+            - __meta_kubernetes_pod_name
+            target_label: pod
+          - action: replace
+            source_labels:
+            - __meta_kubernetes_pod_container_name
+            target_label: container
+          - action: replace
+            replacement: /var/log/pods/*$1/*.log
+            separator: /
+            source_labels:
+            - __meta_kubernetes_pod_uid
+            - __meta_kubernetes_pod_container_name
+            target_label: __path__
+          - action: replace
+            regex: true/(.*)
+            replacement: /var/log/pods/*$1/*.log
+            separator: /
+            source_labels:
+            - __meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash
+            - __meta_kubernetes_pod_annotation_kubernetes_io_config_hash
+            - __meta_kubernetes_pod_container_name
+            target_label: __path__
+          extraLimitsConfig: ""
+          extraRelabelConfigs: []
+          extraScrapeConfigs: ""
+          extraServerConfigs: ""
+          pipelineStages:
+          - cri: {}
+          scrapeConfigs: |
+            # See also https://github.com/grafana/loki/blob/master/production/ksonnet/promtail/scrape_config.libsonnet for reference
+            - job_name: kubernetes-pods
+              pipeline_stages:
+                {{- toYaml .Values.config.snippets.pipelineStages | nindent 4 }}
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels:
+                    - __meta_kubernetes_pod_controller_name
+                  regex: ([0-9a-z-.]+?)(-[0-9a-f]{8,10})?
+                  action: replace
+                  target_label: __tmp_controller_name
+                - source_labels:
+                    - __meta_kubernetes_pod_label_app_kubernetes_io_name
+                    - __meta_kubernetes_pod_label_app
+                    - __tmp_controller_name
+                    - __meta_kubernetes_pod_name
+                  regex: ^;*([^;]+)(;.*)?$
+                  action: replace
+                  target_label: app
+                - source_labels:
+                    - __meta_kubernetes_pod_label_app_kubernetes_io_instance
+                    - __meta_kubernetes_pod_label_instance
+                  regex: ^;*([^;]+)(;.*)?$
+                  action: replace
+                  target_label: instance
+                - source_labels:
+                    - __meta_kubernetes_pod_label_app_kubernetes_io_component
+                    - __meta_kubernetes_pod_label_component
+                  regex: ^;*([^;]+)(;.*)?$
+                  action: replace
+                  target_label: component
+                {{- if .Values.config.snippets.addScrapeJobLabel }}
+                - replacement: kubernetes-pods
+                  target_label: scrape_job
+                {{- end }}
+                {{- toYaml .Values.config.snippets.common | nindent 4 }}
+                {{- with .Values.config.snippets.extraRelabelConfigs }}
+                {{- toYaml . | nindent 4 }}
+                {{- end }}
+      configmap:
+        enabled: false
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: true
+      daemonset:
+        autoscaling:
+          controlledResources: []
+          enabled: false
+          maxAllowed: {}
+          minAllowed: {}
+        enabled: true
+      defaultVolumeMounts:
+      - mountPath: /run/promtail
+        name: run
+      - mountPath: /var/lib/docker/containers
+        name: containers
+        readOnly: true
+      - mountPath: /var/log/pods
+        name: pods
+        readOnly: true
+      defaultVolumes:
+      - hostPath:
+          path: /run/promtail
+        name: run
+      - hostPath:
+          path: /var/lib/docker/containers
+        name: containers
+      - hostPath:
+          path: /var/log/pods
+        name: pods
+      deployment:
+        autoscaling:
+          enabled: false
+          maxReplicas: 10
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+        enabled: false
+        replicaCount: 1
+        strategy:
+          type: RollingUpdate
+      enableServiceLinks: true
+      extraArgs: []
+      extraContainers: {}
+      extraEnv: []
+      extraEnvFrom: []
+      extraObjects: []
+      extraPorts: {}
+      extraVolumeMounts: []
+      extraVolumes: []
+      global:
+        imagePullSecrets: []
+        imageRegistry: ""
+      hostAliases: []
+      httpPathPrefix: ""
+      image:
+        pullPolicy: IfNotPresent
+        registry: docker.io
+        repository: grafana/promtail
+        tag: ""
+      imagePullSecrets: []
+      initContainer: []
+      livenessProbe: {}
+      networkPolicy:
+        enabled: false
+        k8sApi:
+          cidrs: []
+          port: 8443
+        metrics:
+          cidrs: []
+          namespaceSelector: {}
+          podSelector: {}
+      nodeSelector: {}
+      podAnnotations: {}
+      podLabels: {}
+      podSecurityContext:
+        runAsGroup: 0
+        runAsUser: 0
+      podSecurityPolicy:
+        allowPrivilegeEscalation: true
+        fsGroup:
+          rule: RunAsAny
+        hostIPC: false
+        hostNetwork: false
+        hostPID: false
+        privileged: true
+        readOnlyRootFilesystem: true
+        requiredDropCapabilities:
+        - ALL
+        runAsUser:
+          rule: RunAsAny
+        seLinux:
+          rule: RunAsAny
+        supplementalGroups:
+          rule: RunAsAny
+        volumes:
+        - secret
+        - hostPath
+        - downwardAPI
+      rbac:
+        create: true
+        pspEnabled: false
+      readinessProbe:
+        failureThreshold: 5
+        httpGet:
+          path: '{{ printf `%s/ready` .Values.httpPathPrefix }}'
+          port: http-metrics
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 1
+      resources: {}
+      secret:
+        annotations: {}
+        labels: {}
+      service:
+        annotations: {}
+        enabled: false
+        labels: {}
+      serviceAccount:
+        annotations: {}
+        automountServiceAccountToken: true
+        create: true
+        imagePullSecrets: []
+      serviceMonitor:
+        annotations: {}
+        enabled: false
+        labels: {}
+        metricRelabelings: []
+        namespaceSelector: {}
+        prometheusRule:
+          additionalLabels: {}
+          enabled: false
+          rules: []
+        relabelings: []
+        scheme: http
+        targetLabels: []
+      sidecar:
+        configReloader:
+          config:
+            serverPort: 9533
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          enabled: false
+          extraArgs: []
+          extraEnv: []
+          extraEnvFrom: []
+          image:
+            pullPolicy: IfNotPresent
+            registry: ghcr.io
+            repository: jimmidyson/configmap-reload
+            tag: v0.12.0
+          livenessProbe: {}
+          readinessProbe: {}
+          resources: {}
+          serviceMonitor:
+            enabled: true
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      updateStrategy: {}
