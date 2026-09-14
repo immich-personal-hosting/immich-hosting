@@ -1,6 +1,7 @@
-# DRAFT -- generated to bring the existing `metrics` Helm release (installed by hand,
-# currently at revision 14 per `helm list -A`) under Flux management. suspend: true below
-# on purpose -- do not remove it without checking with the owner first.
+# Adopts the existing `metrics` Helm release (installed by hand, revision 14 per
+# `helm list -A`) under Flux management. Was suspend: true while under review; flipped to
+# false to let helm-controller actually take over reconciliation -- see the PR description
+# for the dry-run diff that was checked before doing so.
 #
 # spec.values below is `helm get values metrics -n monitoring -a` (full computed values,
 # not just the overrides in monitoring/values.yaml) captured live on 2026-09-14, with one
@@ -24,7 +25,7 @@ metadata:
   namespace: monitoring
 spec:
   interval: 30m
-  suspend: true
+  suspend: false
   releaseName: metrics
   chart:
     spec:

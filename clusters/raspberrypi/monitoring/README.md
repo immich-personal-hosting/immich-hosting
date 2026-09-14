@@ -1,8 +1,11 @@
-# metrics HelmRelease (draft — not yet reconciled)
+# metrics HelmRelease
 
-Draft manifests to bring the existing, hand-installed `metrics` Helm release
-(monitoring namespace) under Flux management. **Everything here is
-`suspend: true`** — nothing will actually apply until a human flips that off.
+Brings the existing, hand-installed `metrics` Helm release (monitoring
+namespace) under Flux management. Landed as `suspend: true` in PR #1 while
+under review, then flipped to `suspend: false` in PR #4 once the SOPS secret
+wiring (PR #3) was in place and a `helm template` dry-run against the exact
+chart+values confirmed the only diff was the old chart-managed Grafana
+Secret dropping out (expected) and one resulting Grafana pod restart.
 
 ## Contents
 
@@ -52,7 +55,7 @@ Two fields needed special handling rather than copying verbatim:
   `HelmRelease`'s `sourceRef` — they're declared per the request, but
   source-controller resolves the chart's subchart dependencies directly from
   the URLs in `Chart.yaml`/`Chart.lock` when building from git.
-- `metrics.grafana.admin.existingSecret: metrics-grafana` depends on PR #3
-  (SOPS/age secret management) being merged, and on its manual follow-up
-  step (creating the `sops-age` Secret in `flux-system`) being done, before
-  this HelmRelease can be safely unsuspended.
+- `metrics.grafana.admin.existingSecret: metrics-grafana` depended on PR #3
+  (SOPS/age secret management) being merged, and on its manual follow-up step
+  (creating the `sops-age` Secret in `flux-system`) — both done before this
+  was unsuspended in PR #4.
