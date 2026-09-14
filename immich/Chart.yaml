@@ -1,0 +1,21 @@
+apiVersion: v2
+name: immich
+description: Wrapper chart pinning the upstream immich-app chart, plus this cluster's overrides
+type: application
+version: 0.1.0
+appVersion: "v3.1.0" # actual deployed image tag; see values.yaml — the chart's own appVersion label reports v3.0.0
+
+dependencies:
+  - name: immich
+    repository: "oci://ghcr.io/immich-app/immich-charts"
+    # Version is genuinely ambiguous from what's recorded on the Pi — flagging rather than
+    # guessing a single number:
+    #   - The live release's own chart label (captured in immich-infra's docs/audit-raw audit)
+    #     reports `helm.sh/chart: immich-0.13.1`, `app.kubernetes.io/version: v3.0.0`.
+    #   - A later shell-history entry on the Pi shows an upgrade attempt with
+    #     `--version 3.1.0` (a different versioning scheme — immich-charts may have since
+    #     moved to versioning the chart in lockstep with the app).
+    # Confirm the currently-installed version with `helm get metadata immich -n immich` run
+    # by the Monitor agent or by hand (Tier 2 doesn't get live cluster access) before pinning
+    # this for real and running `helm dependency update`.
+    version: "0.13.1"

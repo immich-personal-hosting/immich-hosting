@@ -1,0 +1,49 @@
+# Postgres storage (node-local) — not part of any Helm release, applied directly. Apply with:
+#   kubectl apply -f pvc.yaml -n immich
+#
+# Split out of the combined immich-volumes.yaml on the Pi (which also has the Immich NFS
+# PV/PVC — see ../immich/pvc.yaml for that half). Verified byte-identical to
+# /home/divyakumarjain/photos/immich/k3s/immich-volumes.yaml and
+# immich-infra/docs/audit-raw/raw-manifests/immich-volumes.yaml.
+#
+# KNOWN GAP (see immich-infra/docs/CURRENT_STATE.md "Known gaps"): this is a `local` PV
+# hostPath-backed on node `raspberrypi` with no backup strategy (no CronJob/pg_dump/volume
+# snapshot anywhere) — single point of failure for the whole Immich database.
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-local-pv
+  namespace: immich
+spec:
+  capacity:
+    storage: 20Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /home/divyakumarjain/photos/immich/postgres
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - raspberrypi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-local-pvc
+  namespace: immich
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-storage
+  resources:
+    requests:
+      storage: 20Gi
+  volumeName: postgres-local-pv
