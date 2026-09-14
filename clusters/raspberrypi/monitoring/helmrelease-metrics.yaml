@@ -40,9 +40,20 @@ spec:
   install:
     remediation:
       retries: 3
+    disableWait: true
   upgrade:
     remediation:
       retries: 3
+    disableWait: true
+  # disableWait above: prometheus-data-pv (monitoring/templates/prometheus-data-pv.yaml)
+  # has been stuck reporting status: Terminating for ~50 days (pre-existing, unrelated to
+  # this migration -- looks like a `kubectl delete pv` was run against it at some point and
+  # the kubernetes.io/pv-protection finalizer is blocking actual deletion since it's still
+  # Bound; the PVC is Bound and Prometheus has been reading/writing it fine the whole time).
+  # helm-controller's default active readiness-wait timed out against that status and
+  # marked the upgrade failed, which the previous manual `helm upgrade --install ... `
+  # (no --wait flag, per monitoring/README.md) never hit. disableWait restores that same
+  # non-waiting behavior rather than trying to fix the stuck PV object under this PR.
   values:
     grafana:
       admin:
