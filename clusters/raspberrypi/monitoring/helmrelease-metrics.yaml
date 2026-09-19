@@ -715,7 +715,7 @@ spec:
         batchSize: 4
         connectionLimit: 16384
         defaultValidity: 0s
-        enabled: true
+        enabled: false
         extraArgs: {}
         extraContainers: []
         extraExtendedOptions: ""
@@ -1536,7 +1536,7 @@ spec:
       lokiCanary:
         annotations: {}
         dnsConfig: {}
-        enabled: true
+        enabled: false
         extraArgs: []
         extraEnv: []
         extraEnvFrom: []
@@ -1917,7 +1917,7 @@ spec:
         annotations: {}
         connectionLimit: 16384
         defaultValidity: 12h
-        enabled: true
+        enabled: false
         extraArgs: {}
         extraContainers: []
         extraExtendedOptions: ""
@@ -2100,7 +2100,7 @@ spec:
       test:
         annotations: {}
         canaryServiceAddress: http://loki-canary:3500/metrics
-        enabled: true
+        enabled: false
         image:
           pullPolicy: IfNotPresent
           registry: docker.io
