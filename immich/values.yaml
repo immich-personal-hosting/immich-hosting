@@ -23,11 +23,11 @@ controllers:
           DB_HOSTNAME: "immich-postgres-service"
           DB_PORT: "5432"
           DB_USERNAME: "postgres"
-          # KNOWN GAP (see immich-infra/docs/CURRENT_STATE.md "Known gaps"): this is a
-          # plaintext literal, not sourced from a Secret. Don't "fix" this silently by
-          # swapping in a Secret ref without also rotating the actual Postgres password —
-          # see ../secrets/README.md for the intended pattern once that's ready.
-          DB_PASSWORD: "postgres"
+          DB_PASSWORD:
+            valueFrom:
+              secretKeyRef:
+                name: immich-postgres-credentials
+                key: postgres-password
           DB_DATABASE_NAME: "immich"
           IMMICH_TELEMETRY_INCLUDE: "all"
           IMMICH_LOG_FORMAT: "json"
