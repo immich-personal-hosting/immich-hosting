@@ -143,6 +143,7 @@ Out of scope: the photos, database dumps and Grafana/Prometheus data exist only 
 - **Template changes need a chart version bump** (`monitoring/Chart.yaml`), otherwise Flux keeps deploying its old cached chart. (Changes to the HelmRelease's inlined `spec.values` do not.)
 - **Postgres and Immich are not managed by Flux**: their changes are applied by hand (`kubectl apply`, `helm upgrade`).
 - `flux suspend` is not reliable here: the Kustomization re-applies `suspend: false` from Git within minutes.
+- **Removing a field from Git does not always remove it from the cluster.** Flux applies with server-side apply, and a field owned by *two* managers survives when one of them stops applying it. This bit us when dropping Flux's GitHub token (2026-09-20): `spec.secretRef` on the GitRepository was co-owned by `kustomize-controller` and the `flux` bootstrap CLI, so merging the change did nothing until the field was removed by hand (`kubectl patch ... --type=json -p '[{"op":"remove","path":"/spec/secretRef"}]'`). Check who owns a field with `kubectl get <kind> <name> -o json --show-managed-fields` (kubectl hides them by default), and preview what Flux would do with `kubectl diff --server-side --field-manager=kustomize-controller -f <file>`: plain `kubectl diff` uses client-side logic and shows nothing for such a removal.
 - Rate windows in Grafana must stay at a fixed 5m (Prometheus scrapes about once a minute).
 
 ## 10. Open items (owner to fill in) [?]
