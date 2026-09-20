@@ -25,6 +25,42 @@ runs the apply command by hand.
 Every file above carries a header comment noting where it was verified from and any known
 gap that applies to it — read the file, not just this table, before running its command.
 
+## Replicating this setup elsewhere (site-specific values)
+
+Everything below is specific to this installation. If you rebuild it on other hardware, or copy it to another site, these are the values to change. Nothing else in the repo is machine-specific.
+
+| Value (as here) | Where it is used | How to find / what to change |
+|---|---|---|
+| Node names `omv`, `raspberrypi` | `postgres/deployment.yaml` (`nodeSelector`), `postgres/pvc.yaml` (PV `nodeAffinity`), and the `server:` of every NFS PV | `kubectl get nodes`. `omv` is the storage node (photos, and Postgres data); `raspberrypi` is the control-plane node. |
+| **Postgres data path** `/srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329/k8s/immich-postgres` | **`postgres/pvc.yaml` -> `spec.local.path`** (the only place it is defined; the runbook's `RAW` variable repeats the prefix) | See "Choosing the Postgres data path" below. |
+| NFS server `omv` and export paths `/export/storage/Personal/Immich`, `/export/storage/metrics/grafana`, `/export/storage/metrics/prometheus` | `immich/pvc.yaml`, `monitoring/templates/grafana-data-pv.yaml`, `monitoring/templates/prometheus-data-pv.yaml` | On the NFS server: `sudo exportfs -v`. Create each subdirectory first; Grafana runs as uid 472 and Prometheus as uid 65534, so the directory must be writable by them. |
+| Hostnames `immich.raspberrypi`, `grafana.raspberrypi` | `immich/ingress.yaml`, `monitoring/templates/grafana-ingress.yaml` (also mentioned in the NetworkPolicy comments) | Must resolve on your LAN to a node IP running Traefik. Change the `host:` lines. |
+| Flux directory `clusters/raspberrypi` and the Git repository URL | `clusters/raspberrypi/flux-system/gotk-sync.yaml` (`spec.path`, and the GitRepository `spec.url` / `branch`) | Rename the directory to suit the new cluster, and re-run `flux bootstrap` pointing at your own repository and that path. |
+| SOPS/age recipient `age10j22...` | `.sops.yaml` and every `*.enc.yaml` in `clusters/*/secrets/` | Generate your own key with `age-keygen`, put its **public** key in `.sops.yaml`, **re-create every secret** encrypted to it (`sops -e`), and give the cluster the private key as the `sops-age` Secret in `flux-system`. The existing `*.enc.yaml` files cannot be re-keyed (`sops updatekeys` needs to decrypt them first) and are unreadable without this installation's private key, so they must be replaced with your own values. |
+| Flannel gateway `10.42.0.0/32` | `clusters/raspberrypi/network-policies/cert-manager.yaml` (`allow-apiserver-to-webhook`) | The control-plane node's flannel address, i.e. the source the API server appears from when it calls a pod on the *other* node. On the control-plane node: `ip -4 addr show flannel.1` (use the address as a `/32`). |
+
+### Choosing the Postgres data path
+
+`postgres/pvc.yaml` uses a `local` PV, so it needs an absolute path **on the node named in its `nodeAffinity`**. The path here is the raw mount of the SSD array that OpenMediaVault creates (`/srv/dev-disk-by-uuid-<filesystem UUID>`); the UUID is stable if the array is renumbered. If you replicate this on other hardware:
+
+1. Pick a directory on the node's **fast, redundant local disk**, **not the boot/SD card**, and **not under any NFS export** (this installation exports `/export/storage` to the whole LAN with `no_root_squash`, so a database under it would be readable and writable by any LAN host).
+2. Create it with the ownership Postgres needs (uid/gid 999) and mode 700:
+   `sudo mkdir -p "$D" && sudo chown 999:999 "$D" && sudo chmod 700 "$D"`
+3. Run this preflight **on that node** (set `D` to your path); all four lines must look right before you apply anything:
+
+   ```sh
+   D=/your/path/immich-postgres
+   echo "device : $(findmnt -T "$D" -no SOURCE,FSTYPE)   <- must be your data disk, NOT the root device ($(findmnt -no SOURCE /))"
+   echo "free   : $(df -h --output=avail "$D" | tail -1 | tr -d ' ')"
+   echo "owner  : $(stat -c '%u:%g %a' "$D")   <- must be 999:999 700"
+   for e in $(sudo exportfs -v | awk '/^\//{print $1}'); do case "$D/" in "$e"/*) echo "EXPOSED under NFS export $e";; esac; done   # must print nothing
+   ```
+4. Put the path in `postgres/pvc.yaml` under `spec.local.path`, and make `nodeAffinity` and `postgres/deployment.yaml`'s `nodeSelector` name the same node.
+
+Safety property to keep: the directory should live on the data disk itself (a subdirectory of that disk's mount). If the disk fails to mount at boot, the directory then does not exist and the pod refuses to start, instead of silently writing the database to the SD card.
+
+See `postgres/MIGRATION-TO-OMV.md` for how the data was moved and how to roll back.
+
 ## Where this content came from
 
 Built by comparing two independently-audited sources and confirming they matched:

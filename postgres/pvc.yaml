@@ -2,16 +2,16 @@
 #   kubectl apply -f postgres/pvc.yaml
 # See MIGRATION-TO-OMV.md for the migration from the Raspberry Pi and how to roll back.
 #
-# The volume is a directory on the RAID5 SSD array (md0), on the RAW mount of that filesystem
-# (/srv/dev-disk-by-uuid-...), NOT under /export/storage: omv exports /export/storage to the whole LAN with
-# no_root_squash, so anything under it is readable/writable as root by any LAN host. Only the `storage/`
-# subdirectory is exported; its parent (this path) is not.
+# SITE-SPECIFIC: `spec.local.path` below is the only place the data path is defined, and it is specific to this
+# installation. Replicating elsewhere? See "Replicating this setup elsewhere" in the repo README.md
+# (how to choose the path, the ownership it needs, and a preflight check).
 #
-# Prerequisite (creates the directory with the ownership Postgres needs; uid/gid 999 is `dnsmasq` on omv's
-# own OS, so this is only a name collision -- the directory is mode 700):
-#   sudo mkdir -p /srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329/k8s/immich-postgres
-#   sudo chown 999:999 /srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329/k8s/immich-postgres
-#   sudo chmod 700     /srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329/k8s/immich-postgres
+# Why this path: it is the RAW mount of omv's RAID5 SSD array (OpenMediaVault mounts the filesystem at
+# /srv/dev-disk-by-uuid-<UUID>; the UUID is stable if the array is renumbered), deliberately NOT under
+# /export/storage. omv exports that to the whole LAN with no_root_squash, so anything under it is readable and
+# writable as root by any LAN host; only its `storage/` subdirectory is exported, not this path's parent.
+# The directory must exist before applying (ownership 999:999, mode 700; uid 999 is `dnsmasq` on omv's own OS,
+# a harmless name collision): see MIGRATION-TO-OMV.md step 3.
 #
 # Capacity is nominal for a `local` PV (the filesystem has ~860G free). The DB is ~1.9G (a fresh restore is
 # ~2.6G before checkpoint/vacuum), so 20Gi is generous headroom.
