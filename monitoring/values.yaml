@@ -74,6 +74,16 @@ loki:
       replication_factor: 1
     storage:
       type: filesystem
+    # 30-day retention. Live usage was ~200MB after 41 days, so this is far
+    # below the 10Gi volume; shorten if that changes. Retention on tsdb/v13
+    # needs the compactor to do the deletes, plus a delete_request_store.
+    limits_config:
+      retention_period: 720h
+    compactor:
+      working_directory: /var/loki/compactor
+      retention_enabled: true
+      delete_request_store: filesystem
+      retention_delete_delay: 2h
     schemaConfig:
       configs:
         - from: "2024-04-01"
