@@ -1,0 +1,43 @@
+# ROLLBACK ONLY -- the OLD Postgres storage on `raspberrypi` (SD card), kept so the migration to `omv`
+# can be undone. Do NOT apply during normal operation. The live PV/PVC objects of these names still exist
+# (Retain) after the migration and the Pi's data directory is left untouched until the new setup has run
+# for several days (see MIGRATION-TO-OMV.md). Delete this file, the live objects and the Pi data dir together,
+# with the owner's approval.
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-local-pv
+  namespace: immich
+spec:
+  capacity:
+    storage: 20Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /home/divyakumarjain/photos/immich/postgres
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - raspberrypi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-local-pvc
+  namespace: immich
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: local-storage
+  resources:
+    requests:
+      storage: 20Gi
+  volumeName: postgres-local-pv

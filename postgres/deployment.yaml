@@ -8,9 +8,15 @@
 # file would have dropped them. `args` now match live. Verify with `kubectl -n immich diff -f`
 # before any apply.
 #
+# Runs on `omv` (moved from the Raspberry Pi's SD card to omv's RAID5 SSD array; see
+# MIGRATION-TO-OMV.md). `omv` already holds the photo library, so Immich's dependencies drop from
+# {Pi, omv} to {omv}. Resources are measured (6h of cAdvisor data): memory peak 373Mi, CPU peak 0.93
+# cores / p95 0.16.
+#
 # KNOWN GAPS (see immich-infra/docs/CURRENT_STATE.md "Known gaps"):
 #   - single replica, no HA/read replicas, no Patroni/operator
-#   - no backup strategy (see postgres/pvc.yaml)
+#   - backups: Immich's nightly dump to omv; restore rehearsed 2026-09-20 (needs the \restrict lines
+#     stripped, see MIGRATION-TO-OMV.md); no off-box copy yet
 # The password now comes from the SOPS-managed Secret immich-postgres-credentials. Note
 # POSTGRES_PASSWORD is only honoured when the data directory is first initialised; the live role
 # password was changed with ALTER ROLE.
@@ -36,7 +42,7 @@ spec:
         app: immich-postgres
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "raspberrypi"
+        kubernetes.io/hostname: "omv"
       containers:
         - name: postgres
           # Match your exact Docker Swarm image version to keep disk compatibility
@@ -57,6 +63,14 @@ spec:
               value: "immich"
           ports:
             - containerPort: 5432
+          # Measured sizing. The memory limit is deliberately generous: an OOM kill of the database is far
+          # worse than a little unused headroom. No CPU limit (p95 is 0.16 cores; bursts during index builds).
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
@@ -66,7 +80,7 @@ spec:
       volumes:
         - name: pgdata
           persistentVolumeClaim:
-            claimName: postgres-local-pvc
+            claimName: postgres-omv-pvc
         # Allocate shared memory for vector calculation performance
         - name: dshm
           emptyDir:
