@@ -11,8 +11,8 @@ Scope: the Pi (`raspberrypi`), the only k3s server, is lost or its SD card is de
 | Survives on `omv` | Recreated from Git | **Lost / must be provided** |
 |---|---|---|
 | Photo library, DB dumps (NFS export) | Everything Flux manages (53 objects: monitoring release, secrets, network policies, dashboards) | The **SOPS age private key** (see step 0.1) |
-| Grafana and Prometheus data (NFS) | The 8 hand-applied manifests (`immich/`, `postgres/`) | The Flux **GitHub token** |
-| Postgres data, **after the migration to omv** (`…/k8s/immich-postgres`) | Helm releases `immich`, `cert-manager` (values in the repo) | The k3s **server token and CA** (new ones are issued) |
+| Grafana and Prometheus data (NFS) | The 8 hand-applied manifests (`immich/`, `postgres/`) | (nothing else: Flux needs **no GitHub credential**, see step 5) |
+| Postgres data (`…/k8s/immich-postgres` on omv) | Helm releases `immich`, `cert-manager` (values in the repo) | The k3s **server token and CA** (new ones are issued) |
 | Loki's old data directory (see 6.3) | | Helm release history (irrelevant on a fresh cluster) |
 
 **The database moved to `omv` on 2026-09-20** (`postgres/MIGRATION-TO-OMV.md`), so a Pi loss no longer takes it with it. (Until the old copy on the Pi is decommissioned it still exists there, but do not rely on it.) If Postgres is ever on the Pi's SD card again, a Pi loss also loses the database: restore the latest nightly dump (section 8.1), up to about 24 hours of changes.
@@ -20,7 +20,7 @@ Scope: the Pi (`raspberrypi`), the only k3s server, is lost or its SD card is de
 ### 0.1 Have these ready *before* you need them
 
 - [ ] **The SOPS age private key**, backed up somewhere that is **not** the workstation and **not** the cluster (for example a password manager). Today it exists only in `~/.config/sops/age/keys.txt` on the owner's workstation and in the cluster Secret `flux-system/sops-age`. Never paste it into a chat or commit it. [V]
-- [ ] A **GitHub token** that can read `immich-personal-hosting/immich-hosting`. Flux authenticates over HTTPS with a username and this token (Secret `flux-system`, keys `username` / `password`). Where the token is kept and when it expires: [?]
+- [ ] **Access to the GitHub account/organisation** (including its 2FA recovery codes). Flux itself needs **no token**: the repository is public and Flux pulls it anonymously (since 2026-09-20). If the repository is ever made private, add a read-only deploy key.
 - [ ] `sudo` on both nodes (the Pi needs a password; `omv` is passwordless). [V]
 
 ## 1. Preconditions for the rebuilt Pi [V unless noted]
@@ -73,7 +73,7 @@ This wipes only the agent's own state, so **container images are re-pulled** the
 
 ## 5. Bring Flux back **from Git, not with `flux bootstrap`**
 
-> **Do not run `flux bootstrap`.** It regenerates `clusters/raspberrypi/flux-system/gotk-sync.yaml` and pushes it, which **deletes the hand-added `decryption:` block** ("Manually added (not flux-generated)"). Flux would then be unable to decrypt every `*.enc.yaml` secret. Apply the manifests already in Git instead. [V: the block is in `gotk-sync.yaml` today]
+> **Do not run `flux bootstrap`.** It regenerates `clusters/raspberrypi/flux-system/gotk-sync.yaml` and pushes it, which **deletes the hand-added `decryption:` block** ("Manually added (not flux-generated)"). Flux would then be unable to decrypt every `*.enc.yaml` secret. It would also re-add a GitHub `secretRef` that is no longer needed. Apply the manifests already in Git instead. [V: the block is in `gotk-sync.yaml` today]
 
 Create the namespaces the repo does not define (nothing in Git creates `monitoring`, `immich` or `cert-manager`; all three were made by hand) [V]. If a `clusters/raspberrypi/namespaces/` directory exists in Git, Flux creates them and you can skip this line:
 
@@ -88,9 +88,7 @@ Then (from a checkout of the repo): [D]
 kubectl apply -f clusters/raspberrypi/flux-system/gotk-components.yaml
 kubectl -n flux-system wait --for=condition=Available deploy --all --timeout=300s
 
-# 2. The two Secrets that are deliberately NOT in Git
-kubectl -n flux-system create secret generic flux-system \
-  --from-literal=username='<github-username>' --from-literal=password='<github-token>'
+# 2. The one Secret that is deliberately NOT in Git (Flux pulls the public repo anonymously: no GitHub credential is needed)
 kubectl -n flux-system create secret generic sops-age \
   --from-file=age.agekey="$HOME/.config/sops/age/keys.txt"      # from the off-machine backup
 
@@ -150,7 +148,7 @@ Out of scope: the photos, database dumps and Grafana/Prometheus data exist only 
 ## 10. Open items (owner to fill in) [?]
 
 - [x] DHCP reservations exist for both nodes (owner, 2026-09-20).
-- [ ] Where is the age-key backup kept? **Not backed up as of 2026-09-20**: the owner is creating a password-manager copy and an offline copy.
-- [ ] Where is the GitHub token kept, and when does it expire?
+- [x] **The age key is backed up** (owner, 2026-09-20): a copy in the password manager, and a passphrase-encrypted file `immich-hosting-age-key.txt.age` (its passphrase is in the password manager). Both were verified: the decrypted copy hashes to `12ca947af7b6` and decrypts the repo's secrets (`DECRYPT OK`). **Still to do:** the `.age` file is currently in the owner's home folder, so move it to an offline USB drive kept apart from these machines. [name of the password-manager entry and the USB's location: to be filled in, names only, never the key]
+- [x] No GitHub token is needed by Flux (dropped 2026-09-20; the repository is public). The old personal access token should be revoked on GitHub.
 - [ ] Will the rebuilt Pi use Ethernet? (Its Wi-Fi credentials are not in Git.)
 - [ ] Has a drill ever been run? (No, as of 2026-09-20.)

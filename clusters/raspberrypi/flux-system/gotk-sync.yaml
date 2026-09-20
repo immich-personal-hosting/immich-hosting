@@ -9,8 +9,13 @@ spec:
   interval: 1m0s
   ref:
     branch: main
-  secretRef:
-    name: flux-system
+  # Manually changed (not flux-generated): there is deliberately NO `secretRef` here. The repository is public and Flux
+  # only ever reads it (no image automation, nothing pushes), so it pulls anonymously: no GitHub token to leak, expire
+  # or back up. `flux bootstrap` would re-add a secretRef (and delete the decryption block below): do not use it. If the
+  # repository is ever made private, add a READ-ONLY deploy key (not a personal access token). See
+  # docs/DISASTER-RECOVERY.md. (Rollout note: on the live object `spec.secretRef` is co-owned by the `flux` bootstrap CLI
+  # and kustomize-controller, so removing it here does not remove it live: it was removed once by hand with
+  # `kubectl patch ... op: remove /spec/secretRef`.)
   url: https://github.com/immich-personal-hosting/immich-hosting.git
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
