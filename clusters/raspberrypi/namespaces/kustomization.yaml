@@ -1,0 +1,7 @@
+# The namespaces the rest of the repo assumes exist. Before this, nothing in Git created them (they were made by hand
+# on 2025-07-25 and 2026-08-01), so a rebuilt cluster failed until someone ran `kubectl create namespace`.
+# See docs/DISASTER-RECOVERY.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
