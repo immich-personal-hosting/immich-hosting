@@ -31,20 +31,26 @@ controllers:
           DB_DATABASE_NAME: "immich"
           IMMICH_TELEMETRY_INCLUDE: "all"
           IMMICH_LOG_FORMAT: "json"
-          IMMICH_MACHINE_LEARNING_URL: "http://immich-machine-learning:3003"
+          # IMMICH_MACHINE_LEARNING_URL is deliberately NOT set: the chart default is
+          # http://<release>-machine-learning:3003, which is right once the ML Service exposes 3003
+          # (see the `server:` note below). Do not override it with :2283.
 
+# Server-only settings live under `server:` -- a top-level `service:`/`controllers:` is shared by
+# ALL components (server, machine-learning, valkey) and leaked 2283/8081 into the ML and Valkey Services.
 
-service:
-  main:
-    ports:
-      http:
-        port: 2283
-      metrics:
-        port: 8081
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/path: "/metrics"
-      prometheus.io/port: "8081"
+server:
+  service:
+    main:
+      ports:
+        http:
+          port: 2283
+        metrics:
+          port: 8081
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8081"
+
 
 
 # Hailo-8 NPU pass-through is NOT configured here. The block that used to live here sat under
