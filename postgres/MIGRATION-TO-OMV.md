@@ -1,6 +1,6 @@
 # Migrating Immich's Postgres from the Raspberry Pi to omv
 
-**Status: PLANNED, not executed.** Merging the PR that contains this file changes nothing on the cluster: Postgres is applied by hand.
+**Status: EXECUTED 2026-09-20 (see "Execution record" at the end).** Postgres now runs on `omv`. The old copy on the Pi is intentionally still there as the rollback. Postgres is applied by hand, so nothing here is applied by merging.
 
 ## Why
 
@@ -33,7 +33,7 @@ Set once: `export KUBECONFIG=~/.kube/config-pi-admin`, `RAW=/srv/dev-disk-by-uui
 1. **Baseline** (save the output to compare later):
    `kubectl -n immich exec deploy/immich-postgres -- psql -U postgres -d immich -At -c "select (select count(*) from asset),(select count(*) from \"user\"),(select count(*) from album),(select count(*) from smart_search),(select count(*) from asset_face)"`
 2. **Safety dump** (custom format) straight to omv:
-   `kubectl -n immich exec deploy/immich-postgres -- pg_dump -U postgres -Fc immich | ssh omv 'cat > /export/storage/backups/immich-postgres/pre-migration.dump'` then check it with `pg_restore -l`.
+   `kubectl -n immich exec deploy/immich-postgres -- pg_dump -U postgres -Fc immich | ssh omv "sudo tee $RAW/k8s/pre-migration-$(date +%Y%m%d-%H%M).dump.partial >/dev/null && sudo chmod 600 ...partial && sudo mv ...partial ...dump"` then check it with `pg_restore -l` (read it back over ssh into the pod). **Write it to the raw mount (root-only), not under `/export/storage`**: the export is readable by the whole LAN and the dump is your entire database.
 3. **Create the target directory:** `ssh omv "sudo mkdir -p $D && sudo chown 999:999 $D && sudo chmod 700 $D"`
 4. **Quiesce Immich:** `kubectl -n immich scale deploy/immich-server --replicas=0` (Valkey and ML stay up). Do **not** run `helm upgrade` until step 10.
 5. **Stop Postgres cleanly:** `kubectl -n immich scale deploy/immich-postgres --replicas=0`, wait for the pod to be gone.
@@ -41,9 +41,9 @@ Set once: `export KUBECONFIG=~/.kube/config-pi-admin`, `RAW=/srv/dev-disk-by-uui
    - Helper: a pod with `nodeSelector: raspberrypi`, `securityContext.runAsUser: 0`, hostPath `/home/divyakumarjain/photos/immich/postgres` mounted read-only at `/src`, command `sleep 3600`.
    - **Confirm the source was shut down cleanly:** `kubectl exec <helper> -- pg_controldata /src | grep 'cluster state'` must say `shut down`.
    - Copy: `kubectl -n immich exec <helper> -- tar -C /src -cpf - . | ssh omv "sudo tar -C $D -xpf - --numeric-owner"`
-   - **Verify** (both must match): file count and total bytes, and a manifest hash:
-     - Pi (in helper): `cd /src && find . -type f | sort | xargs stat -c '%s %n' | sha256sum`
-     - omv: `cd $D && sudo find . -type f | sort | sudo xargs stat -c '%s %n' | sha256sum`
+   - **Verify** (all must match): entry count, file count, total bytes, and a hash of every file's *contents*. **Always use `LC_ALL=C` on `sort`, `find` and `xargs`**: the container (`en_US.utf8`) and `omv` (`C.UTF-8`) order files differently, so a plain `sort` gives different hashes for identical data (this happened during the execution and looked like a corrupt copy until the locale was fixed).
+     - Pi (in helper): `cd /src && LC_ALL=C find . -type f | LC_ALL=C sort | LC_ALL=C xargs sha256sum | sha256sum`
+     - omv: `sudo bash -c 'cd $D && LC_ALL=C find . -type f | LC_ALL=C sort | LC_ALL=C xargs sha256sum | sha256sum'`
    - **If anything differs: stop.** Delete the target contents and repeat; do not start Postgres on a partial copy.
 7. **Apply and start on omv:** `kubectl apply -f postgres/pvc.yaml` then `kubectl -n immich apply -f postgres/deployment.yaml`; wait for the rollout.
 8. **Verify Postgres** before touching Immich:
@@ -71,3 +71,24 @@ Keep the Pi's data directory and the old PV/PVC **untouched for several days** w
 - uid/gid 999 (Postgres) is the `dnsmasq` user on `omv`'s own OS. The directory is mode 700; it is only a name collision.
 - Postgres is now pinned to `omv` (data gravity). If `omv` is down, Immich is down: it needs `omv` for the photos anyway.
 - Still to decide separately: a second CoreDNS replica and a second A record (or VIP) for `immich.raspberrypi`, so a Pi outage does not take the name or DNS with it.
+
+## Execution record (2026-09-20)
+
+| | |
+|---|---|
+| Immich downtime | **4 min 23 s** (server scaled to 0 at 20:24:00 UTC, back at 20:28:23 UTC) |
+| Safety dump | 622 MB custom-format, root-only, 182 TOC entries, taken before any downtime |
+| Source state | `pg_controldata`: `Database cluster state: shut down`, final checkpoint 20:24:01 UTC, no `postmaster.pid` |
+| Copy | 1,820 entries / 1,789 files / 2,024,636,521 bytes in **65 s** via a read-only root helper pod on the Pi |
+| Verification | entries, files, bytes equal; SHA-256 over the contents of **all 1,789 files identical** on both sides |
+| First start on omv | `database system was shut down at 20:24:01 UTC` then `ready to accept connections`: **no crash recovery** |
+| Data | counts identical to the pre-migration baseline (79,117 assets / 2 users / 9 albums / 69,927 embeddings / 150,739 faces / 79,114 exif); schema 66 / 474 / 231 / 523; extensions identical; 0 invalid indexes; both vector indexes used |
+| After restart | ingress `pong` via both nodes, no server errors, ML healthy, 6 server connections to the new Postgres, resources applied (250m / 512Mi, 1.5Gi limit) |
+| NetworkPolicy | unchanged and correct after the move (see below) |
+
+**What was learned**
+- The manifest hash first differed because of the locale (see step 6); the data was identical.
+- A **brand-new pod's first connection attempt** after creation can be refused for a few seconds by the NetworkPolicy while the rules pick up its IP (first of eight attempts blocked, the rest reached). A rescheduled server pod may therefore retry briefly; Immich did so without errors.
+- The runbook originally put the safety dump under the exported `backups/` folder; it now goes to the raw mount, root-only.
+
+**Still in place, on purpose (do not delete yet):** the old PV/PVC objects (`postgres-local-pv`, `postgres-local-pvc`), the Pi's data directory `/home/divyakumarjain/photos/immich/postgres` (untouched, cleanly shut down: it is the rollback), and the safety dump `$RAW/k8s/pre-migration-20260920-1621.dump`. Decommission them together, with the owner's approval, after the new setup has run for several days and at least one nightly dump has been written against the new Postgres.
