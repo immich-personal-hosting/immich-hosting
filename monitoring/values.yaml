@@ -53,6 +53,24 @@ grafana:
     userKey: admin-user
     passwordKey: admin-password
 
+  # Dashboards live in clusters/raspberrypi/dashboards/ and reach Grafana as the ConfigMap
+  # grafana-dashboards-repo (applied by Flux), mounted by the chart and loaded by a file provider.
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: repo-dashboards
+          orgId: 1
+          folder: Immich Hosting
+          type: file
+          disableDeletion: false
+          allowUiUpdates: false
+          updateIntervalSeconds: 60
+          options:
+            path: /var/lib/grafana/dashboards/repo-dashboards
+  dashboardsConfigMaps:
+    repo-dashboards: grafana-dashboards-repo
+
   datasources:
     datasources.yaml:
       apiVersion: 1

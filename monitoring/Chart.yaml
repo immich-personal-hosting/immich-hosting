@@ -2,7 +2,7 @@ apiVersion: v2
 name: metrics
 description: Umbrella chart for metrics stack
 type: application
-version: 0.1.1
+version: 0.1.2
 
 dependencies:
   - name: prometheus
