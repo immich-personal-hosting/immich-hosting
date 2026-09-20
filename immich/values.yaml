@@ -47,35 +47,10 @@ service:
       prometheus.io/port: "8081"
 
 
-# HAILO-8 NPU HARDWARE MAP ACCELERATION BLOCK
-immich-machine-learning:
-  enabled: true
-
-  # Custom Helm Controller injection to give the pod raw hardware pass-through
-  controllers:
-    machine-learning:
-      containers:
-        machine-learning:
-          # Required for a container to directly manipulate the PCIe M.2 bus
-          securityContext:
-            privileged: true
-          # Mount the character device map into the container filesystem context
-          volumeMounts:
-            - name: hailo-device
-              mountPath: /dev/hailo0
-      # KNOWN GAP (see immich-infra/docs/CURRENT_STATE.md "Known gaps"): no nodeAffinity/
-      # nodeSelector pins this to the node that actually has /dev/hailo0 (currently `omv`).
-      # A reschedule onto a node without the device will crash-loop. Left as-is here to
-      # mirror the live cluster faithfully — this is the Fixer's highest-priority proposal
-      # candidate, not something to patch quietly while restructuring the repo.
-
-  # Link the actual physical character file from the Raspberry Pi motherboard layer
-  volumes:
-    - name: hailo-device
-      hostPath:
-        path: /dev/hailo0
-        type: CharDevice
-
+# Hailo-8 NPU pass-through is NOT configured here. The block that used to live here sat under
+# a key chart 0.13.1 doesn't read (`immich-machine-learning`), so it never applied to the live
+# pod (verified 2026-09-20: not privileged, no /dev/hailo0). Work in progress, on hold until the
+# hardware/model compilation is ready, is kept off main on branch `wip/hailo-overlay`.
 
 # Mount Immich Photos directly to your NFS folder
 immich:
