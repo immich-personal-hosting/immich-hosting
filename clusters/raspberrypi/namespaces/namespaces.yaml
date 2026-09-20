@@ -1,0 +1,24 @@
+# IMPORTANT: every namespace here carries `kustomize.toolkit.fluxcd.io/prune: disabled`. The flux-system Kustomization
+# has prune: true, so WITHOUT this annotation, deleting an entry from this file would make Flux delete the namespace
+# and everything in it (the Immich database, Grafana, ...). With it, Flux never deletes them: removing a namespace is
+# always a deliberate manual `kubectl delete`.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: immich
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
