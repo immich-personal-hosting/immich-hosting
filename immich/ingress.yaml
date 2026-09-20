@@ -38,8 +38,7 @@ spec:
   buffering:
     maxRequestBodyBytes: 10485760000 # Fixes the cutoff text to a clean 10GB buffer limit
 
-# KNOWN GAP (see immich-infra/docs/CURRENT_STATE.md "Known gaps"): no `tls:` block and no
-# cert-manager.io/cluster-issuer annotation here, so this Ingress serves plaintext HTTP only
-# even though cert-manager is installed. See ../cert-manager/cluster-issuer.yaml for the
-# related (also-broken) ClusterIssuer. Left as-is — TLS intent here is unconfirmed, not a
-# bug to silently patch while restructuring the repo.
+# TLS: deliberately deferred (decision 2026-09-20). This Ingress serves plaintext HTTP on the
+# LAN. `immich.raspberrypi` is a private name, so public ACME can't issue for it, and no public
+# domain is owned. The old letsencrypt-prod ClusterIssuer was removed (invalid ACME URL, never
+# usable). If TLS is wanted later: a domain + Let's Encrypt DNS-01, or a private CA issuer.
