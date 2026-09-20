@@ -48,6 +48,11 @@ grafana:
     enabled: true
     existingClaim: grafana-data-pvc
 
+  admin:
+    existingSecret: "metrics-grafana"
+    userKey: admin-user
+    passwordKey: admin-password
+
   datasources:
     datasources.yaml:
       apiVersion: 1
