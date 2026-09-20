@@ -1,0 +1,125 @@
+# immich: ingress-only (egress restriction is a documented known gap). Flows mapped 2026-09-20 from
+# pod ports, live client lists (Valkey: 80 conns from the server) and the server's own config:
+#   Traefik (kube-system)   -> immich-server :2283      (immich.raspberrypi ingress; web + mobile app)
+#   Prometheus (monitoring) -> immich-server :8081      (metrics)
+#   immich-server           -> Postgres :5432           (raw-manifest pod, label app=immich-postgres)
+#   immich-server           -> Valkey :6379
+#   immich-server           -> machine-learning :3003   (pod port; the Service maps 2283 -> 3003)
+# Deliberately NOT allowed: Prometheus -> ML/Valkey :8081. Those two scrape targets have been down
+# 20+ days (the chart puts the scrape annotation on those Services, but nothing serves metrics
+# there). Kubelet probes are node-local and always allowed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: immich
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-to-server
+  namespace: immich
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: server
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 2283
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-server-metrics
+  namespace: immich
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: server
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              app.kubernetes.io/component: server
+      ports:
+        - protocol: TCP
+          port: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-postgres
+  namespace: immich
+spec:
+  podSelector:
+    matchLabels:
+      app: immich-postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: server
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-valkey
+  namespace: immich
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: valkey
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: server
+        # Valkey also shows ~80 connections from its own pod IP; allow it so a self/hairpin path
+        # can't be cut by accident.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: valkey
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-to-machine-learning
+  namespace: immich
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: machine-learning
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: server
+      ports:
+        - protocol: TCP
+          port: 3003
