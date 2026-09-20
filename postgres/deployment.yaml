@@ -2,13 +2,18 @@
 # Immich Helm release. Apply with:
 #   kubectl apply -f deployment.yaml -n immich
 #
-# Verified byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-postgres.yaml on
-# raspberrypi and immich-infra/docs/audit-raw/raw-manifests/immich-postgres.yaml.
+# NOTE (2026-09-20): earlier versions of this header claimed the file was byte-identical to
+# the live cluster. It was not: it lacked the `args` below (`-c shared_preload_libraries=vchord.so`,
+# which the running DB depends on -- `SHOW shared_preload_libraries` = vchord.so). Applying the old
+# file would have dropped them. `args` now match live. Verify with `kubectl -n immich diff -f`
+# before any apply.
 #
 # KNOWN GAPS (see immich-infra/docs/CURRENT_STATE.md "Known gaps"):
-#   - POSTGRES_PASSWORD is a plaintext literal, not sourced from a Secret (see ../secrets/README.md)
 #   - single replica, no HA/read replicas, no Patroni/operator
 #   - no backup strategy (see postgres/pvc.yaml)
+# The password now comes from the SOPS-managed Secret immich-postgres-credentials. Note
+# POSTGRES_PASSWORD is only honoured when the data directory is first initialised; the live role
+# password was changed with ALTER ROLE.
 
 ---
 apiVersion: apps/v1
@@ -18,6 +23,10 @@ metadata:
   namespace: immich
 spec:
   replicas: 1
+  # Recreate, not RollingUpdate: pgdata is a node-local volume, and a surge pod would start a
+  # second postgres against the same data directory while the first is still running.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: immich-postgres
@@ -32,6 +41,10 @@ spec:
         - name: postgres
           # Match your exact Docker Swarm image version to keep disk compatibility
           image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:32324a2f41df5de9efe1af166b7008c3f55646f8d0e00d9550c16c9822366b4a
+          args:
+            - postgres
+            - -c
+            - shared_preload_libraries=vchord.so
           env:
             - name: POSTGRES_PASSWORD
               valueFrom:
