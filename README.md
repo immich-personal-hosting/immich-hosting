@@ -20,7 +20,6 @@ runs the apply command by hand.
 | Postgres | raw manifest (not Helm) | `postgres/deployment.yaml`, `postgres/service.yaml`, `postgres/pvc.yaml` | `kubectl apply -f postgres/` |
 | Monitoring (Prometheus/Grafana/Loki/Promtail) | Helm (local chart, not published) | `monitoring/` | `helm dependency build monitoring && helm upgrade --install metrics monitoring -f monitoring/values.yaml -n monitoring` |
 | cert-manager | Helm (`oci://quay.io/jetstack/charts/cert-manager`) | `cert-manager/values.yaml` | `helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager -f cert-manager/values.yaml -n cert-manager` |
-| cert-manager ClusterIssuer | raw manifest | `cert-manager/cluster-issuer.yaml` | `kubectl apply -f cert-manager/cluster-issuer.yaml` |
 | Traefik | k3s-bundled (installed automatically by k3s itself, not by this repo) | — | — |
 
 Every file above carries a header comment noting where it was verified from and any known
