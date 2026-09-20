@@ -14,12 +14,12 @@ runs the apply command by hand.
 
 | Component | Type | Path | Apply command |
 |---|---|---|---|
-| Immich | Helm (`oci://ghcr.io/immich-app/immich-charts/immich`) | `immich/` | `helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich -f immich/values.yaml -n immich` — **version unconfirmed, see `immich/Chart.yaml`** |
+| Immich | Helm (`oci://ghcr.io/immich-app/immich-charts/immich`) | `immich/` | `helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich --version 0.13.1 -f immich/values.yaml -n immich` (chart `immich-0.13.1`, confirmed with `helm list` on 2026-09-20) |
 | Immich ingress + middleware | raw manifest | `immich/ingress.yaml` | `kubectl apply -f immich/ingress.yaml` |
 | Immich photo library storage (NFS) | raw manifest | `immich/pvc.yaml` | `kubectl apply -f immich/pvc.yaml` |
 | Postgres | raw manifest (not Helm) | `postgres/deployment.yaml`, `postgres/service.yaml`, `postgres/pvc.yaml` | `kubectl apply -f postgres/` |
 | Monitoring (Prometheus/Grafana/Loki/Promtail) | Helm (local chart, not published) | `monitoring/` | `helm dependency build monitoring && helm upgrade --install metrics monitoring -f monitoring/values.yaml -n monitoring` |
-| cert-manager | Helm (`oci://quay.io/jetstack/charts/cert-manager`) | `cert-manager/values.yaml` | `helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager -f cert-manager/values.yaml -n cert-manager` |
+| cert-manager | Helm (`oci://quay.io/jetstack/charts/cert-manager`) | `cert-manager/values.yaml` | `helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.21.0 -f cert-manager/values.yaml -n cert-manager` (chart `cert-manager-v1.21.0`, confirmed with `helm list`) |
 | Traefik | k3s-bundled (installed automatically by k3s itself, not by this repo) | — | — |
 
 Every file above carries a header comment noting where it was verified from and any known
@@ -60,6 +60,8 @@ Everything below is specific to this installation. If you rebuild it on other ha
 Safety property to keep: the directory should live on the data disk itself (a subdirectory of that disk's mount). If the disk fails to mount at boot, the directory then does not exist and the pod refuses to start, instead of silently writing the database to the SD card.
 
 See `postgres/MIGRATION-TO-OMV.md` for how the data was moved and how to roll back.
+
+**Rebuilding the control plane** (the Raspberry Pi: it is the only k3s server and its state has no backup) is documented in `docs/DISASTER-RECOVERY.md`: what survives, what must be provided (the SOPS age key, a GitHub token), and the order to bring everything back from Git.
 
 ## Where this content came from
 
