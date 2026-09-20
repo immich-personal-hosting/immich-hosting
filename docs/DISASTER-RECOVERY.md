@@ -15,7 +15,7 @@ Scope: the Pi (`raspberrypi`), the only k3s server, is lost or its SD card is de
 | Postgres data, **after the migration to omv** (`…/k8s/immich-postgres`) | Helm releases `immich`, `cert-manager` (values in the repo) | The k3s **server token and CA** (new ones are issued) |
 | Loki's old data directory (see 6.3) | | Helm release history (irrelevant on a fresh cluster) |
 
-**Before the Postgres migration, the database is on the Pi's SD card too.** Then a Pi loss also loses the database: restore the latest nightly dump (section 6.1), up to about 24 hours of changes.
+**The database moved to `omv` on 2026-09-20** (`postgres/MIGRATION-TO-OMV.md`), so a Pi loss no longer takes it with it. (Until the old copy on the Pi is decommissioned it still exists there, but do not rely on it.) If Postgres is ever on the Pi's SD card again, a Pi loss also loses the database: restore the latest nightly dump (section 8.1), up to about 24 hours of changes.
 
 ### 0.1 Have these ready *before* you need them
 
@@ -26,7 +26,7 @@ Scope: the Pi (`raspberrypi`), the only k3s server, is lost or its SD card is de
 ## 1. Preconditions for the rebuilt Pi [V unless noted]
 
 - Debian 13 (Raspberry Pi OS "trixie"), **arm64** (`aarch64`); the original ran kernel `6.18.39+rpt-rpi-2712`.
-- Hostname **`raspberrypi`**, and it must come up at **192.168.1.161** and resolve as `raspberrypi` from the other machines. Today `raspberrypi` resolves through the **router's DNS** (`raspberrypi.mynetworksettings.com`), not a hosts file, and both nodes get their address by **DHCP**. Whether the router holds a DHCP reservation for the Pi: [?].
+- Hostname **`raspberrypi`**, and it must come up at **192.168.1.161** and resolve as `raspberrypi` from the other machines. Today `raspberrypi` resolves through the **router's DNS** (`raspberrypi.mynetworksettings.com`), not a hosts file. Both nodes get their address by DHCP and **both have a DHCP reservation on the router** (confirmed by the owner 2026-09-20; reservations are by MAC: `omv` eth0 `2c:cf:67:3f:b3:05`, Pi wlan0 `2c:cf:67:ec:fb:af`, Pi eth0 `2c:cf:67:ec:fb:ae`). A rebuilt Pi with a different network card has a different MAC, so update the reservation.
 - **Network:** the original Pi is on **Wi-Fi (`wlan0`)** and its Ethernet port (`eth0`) has no cable. Prefer a cable on rebuild: the control plane and the pod network should not depend on wireless. The Wi-Fi name and password are not stored anywhere in Git: [?].
 
 ## 2. Install k3s on the Pi
@@ -149,8 +149,8 @@ Out of scope: the photos, database dumps and Grafana/Prometheus data exist only 
 
 ## 10. Open items (owner to fill in) [?]
 
-- [ ] Does the router hold a DHCP reservation for `192.168.1.161` (Pi) and `192.168.1.164` (`omv`)? If not, a rebuilt node may change address.
-- [ ] Where is the age-key backup kept?
+- [x] DHCP reservations exist for both nodes (owner, 2026-09-20).
+- [ ] Where is the age-key backup kept? **Not backed up as of 2026-09-20**: the owner is creating a password-manager copy and an offline copy.
 - [ ] Where is the GitHub token kept, and when does it expire?
 - [ ] Will the rebuilt Pi use Ethernet? (Its Wi-Fi credentials are not in Git.)
 - [ ] Has a drill ever been run? (No, as of 2026-09-20.)
