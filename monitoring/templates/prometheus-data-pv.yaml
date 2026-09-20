@@ -1,7 +1,10 @@
+# Scoped to /export/storage/metrics/prometheus (was the export root, /export/storage,
+# which shared the volume with the photo library). Renamed from prometheus-data-pv
+# because the old PV object is stuck Terminating (pv-protection) and its name can't be reused.
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: prometheus-data-pv
+  name: prometheus-data-pv-scoped
   labels:
     app.kubernetes.io/name: prometheus
     app.kubernetes.io/component: storage
@@ -23,4 +26,4 @@ spec:
     - noresvport
   nfs:
     server: omv
-    path: /export/storage
+    path: /export/storage/metrics/prometheus

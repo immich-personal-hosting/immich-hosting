@@ -11,6 +11,7 @@ spec:
   accessModes:
     - ReadWriteMany
   storageClassName: nfs-manual
+  volumeName: prometheus-data-pv-scoped
   resources:
     requests:
       storage: 100Gi
