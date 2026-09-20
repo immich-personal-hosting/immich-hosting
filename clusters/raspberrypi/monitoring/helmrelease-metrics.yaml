@@ -84,9 +84,22 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       createConfigmap: true
-      dashboardProviders: {}
+      dashboardProviders:
+        dashboardproviders.yaml:
+          apiVersion: 1
+          providers:
+          - disableDeletion: false
+            allowUiUpdates: false
+            folder: Immich Hosting
+            name: repo-dashboards
+            options:
+              path: /var/lib/grafana/dashboards/repo-dashboards
+            orgId: 1
+            type: file
+            updateIntervalSeconds: 60
       dashboards: {}
-      dashboardsConfigMaps: {}
+      dashboardsConfigMaps:
+        repo-dashboards: grafana-dashboards-repo
       datasources:
         datasources.yaml:
           apiVersion: 1

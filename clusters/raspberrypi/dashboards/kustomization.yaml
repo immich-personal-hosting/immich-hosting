@@ -1,0 +1,23 @@
+# Grafana dashboards, provisioned through Flux. The JSON files here become one ConfigMap in the monitoring
+# namespace; the Grafana chart mounts it (grafana.dashboardsConfigMaps in the HelmRelease values) and a file
+# provider loads it into the "Immich Hosting" folder. Editing a JSON file and merging is all it takes to update a
+# dashboard: no chart version bump (this is not part of the Helm chart) and no Grafana restart (the mounted
+# ConfigMap refreshes in about a minute, then the provider re-reads it every 60s).
+# The name is stable (no hash suffix) because the chart references it by name.
+# Workflow for changes: tweak a dashboard in the Grafana UI, export it (Export -> Export as JSON), replace the
+# file here and merge. UI edits are not persisted on their own (allowUiUpdates: false), so Git stays the source.
+# The dashboards reference datasources through the `ds` / `loki` variables, never a hard-coded datasource UID.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    app.kubernetes.io/part-of: metrics
+    app.kubernetes.io/component: dashboards
+configMapGenerator:
+  - name: grafana-dashboards-repo
+    files:
+      - nodes.json
+      - immich.json
+      - cluster.json
