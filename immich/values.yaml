@@ -8,6 +8,15 @@ controllers:
       main:
         image:
           tag: v3.1.0
+        # Sized from 28d of Prometheus cAdvisor history (2026-09-20): memory working set
+        # p99 ~1.1Gi, max ~1.7Gi; CPU ~5m at p95 with a short spike to ~1.9 cores. Memory
+        # limit = max + ~50%. No CPU limit on purpose, to avoid throttling those spikes.
+        resources:
+          requests:
+            cpu: 100m
+            memory: 1Gi
+          limits:
+            memory: 2560Mi
         env:
           REDIS_HOSTNAME: "immich-valkey"
           # CRITICAL FIX FOR v3: Explicitly map your network service endpoint strings here
@@ -74,6 +83,34 @@ immich:
     library:
       existingClaim: "immich-nfs-pvc" # see pvc.yaml in this directory
 
+# Provisional ML sizing -- NOT from measured data. The ML pod was effectively idle for the
+# whole 28d window (max 256Mi, <0.01 cores), so real inference load is unmeasured. Re-size
+# after running a Smart Search / face-detection job and watching kubectl top. Note: this
+# uses the chart's real key `machine-learning` (container `main`); the Hailo block above
+# uses `immich-machine-learning`, which the chart does not read.
+machine-learning:
+  controllers:
+    main:
+      containers:
+        main:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 3Gi
+
 # Enable the built-in Valkey instance to handle application caching
 valkey:
   enabled: true
+  controllers:
+    main:
+      containers:
+        main:
+          # measured max working set ~90Mi over 28d
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
