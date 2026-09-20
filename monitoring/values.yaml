@@ -84,14 +84,19 @@ loki:
             prefix: loki_index_
             period: 24h
 
-  # CORRECT TOGGLES FOR LOKI V6 SUB-CHARTS
-  loki-canary:
+  # Loki chart 6.22.0 uses camelCase top-level keys (verified with
+  # `helm show values`); the kebab-case keys previously here matched nothing,
+  # so the canary DaemonSet and both Memcached caches stayed on by default.
+  lokiCanary:
     enabled: false
-  chunks-cache:
+  # The chart's helm-test hook requires the canary, so it must go too.
+  test:
     enabled: false
-  results-cache:
+  chunksCache:
     enabled: false
-    
+  resultsCache:
+    enabled: false
+
   # Turn off the scalable microservice targets explicitly
   read:
     replicas: 0
