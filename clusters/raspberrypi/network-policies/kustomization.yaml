@@ -1,0 +1,9 @@
+# NetworkPolicies, one file per namespace, added one namespace at a time (verify between each).
+# Enforcement was verified 2026-09-20 in a throwaway namespace: k3s's built-in controller enforces
+# policies, node-local host traffic is always allowed, and a host process on node X talking to a
+# pod on the OTHER node arrives from X's flannel gateway address (raspberrypi = 10.42.0.0/32,
+# omv = 10.42.1.0/32), NOT the node's LAN IP.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cert-manager.yaml
