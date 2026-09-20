@@ -64,11 +64,12 @@ immich:
     library:
       existingClaim: "immich-nfs-pvc" # see pvc.yaml in this directory
 
-# Provisional ML sizing -- NOT from measured data. The ML pod was effectively idle for the
-# whole 28d window (max 256Mi, <0.01 cores), so real inference load is unmeasured. Re-size
-# after running a Smart Search / face-detection job and watching kubectl top. Note: this
-# uses the chart's real key `machine-learning` (container `main`); the Hailo block above
-# uses `immich-machine-learning`, which the chart does not read.
+# ML sizing, measured 2026-09-20 over a full Smart Search + Face Detection run on the Pi (6h of Prometheus
+# cAdvisor data): memory peak 1036Mi (p95 773Mi), CPU peak 3.1 cores (p95 3.0). Requests reflect the memory
+# peak; the memory limit is ~2x the peak (headroom for the unmeasured OCR model). ML is a batch worker, so it
+# has a deliberate CPU limit: unlimited it took 3 of the Pi's 4 cores (86% CPU, 74C), and the Pi also runs the
+# k3s control plane. Throttling only costs job time. Uses the chart's real key `machine-learning` (container
+# `main`).
 machine-learning:
   controllers:
     main:
@@ -76,10 +77,11 @@ machine-learning:
         main:
           resources:
             requests:
-              cpu: 100m
-              memory: 512Mi
+              cpu: 500m
+              memory: 1Gi
             limits:
-              memory: 3Gi
+              cpu: "2"
+              memory: 2Gi
 
 # Enable the built-in Valkey instance to handle application caching
 valkey:
