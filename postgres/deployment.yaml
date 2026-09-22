@@ -63,14 +63,13 @@ spec:
               value: "immich"
           ports:
             - containerPort: 5432
-          # Measured sizing. The memory limit is deliberately generous: an OOM kill of the database is far
-          # worse than a little unused headroom. No CPU limit (p95 is 0.16 cores; bursts during index builds).
+          # Increased resource constraints to prevent OOM kills and restarts
           resources:
             requests:
-              cpu: 250m
-              memory: 512Mi
+              cpu: 500m
+              memory: 1024Mi
             limits:
-              memory: 1536Mi
+              memory: 2048Mi
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
