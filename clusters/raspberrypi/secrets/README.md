@@ -6,6 +6,10 @@ SOPS/age-encrypted Kubernetes Secret manifests that Flux applies directly (via t
 - `grafana-admin.enc.yaml` — the `metrics-grafana` Secret (admin-user/admin-password) used
   by the `metrics` Helm release's Grafana subchart. Only `stringData` is encrypted; `kind`,
   `metadata`, etc. stay plaintext so diffs are readable.
+- `postgres.enc.yaml` — the `immich-postgres-credentials` Secret (`postgres-password`,
+  namespace `immich`), referenced by `postgres/deployment.yaml`'s `POSTGRES_PASSWORD` and
+  `clusters/raspberrypi/immich/values.yaml`'s `DB_PASSWORD`, both via `secretKeyRef` — no
+  plaintext password in either. Same encryption shape as above.
 
 ## How decryption works here
 

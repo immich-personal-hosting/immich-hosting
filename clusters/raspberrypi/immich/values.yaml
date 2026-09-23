@@ -1,6 +1,13 @@
 # Values for the immich-app chart, as actually running on the cluster
 # (verified byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-cv.yaml on
 # raspberrypi and to immich-infra/docs/audit-raw/raw-manifests/immich-cv.yaml).
+#
+# Flux-managed and genuinely live: kustomization.yaml in this directory turns this file
+# into a ConfigMap (stable name, no hash suffix — see its own comment), which
+# helmrelease.yaml reads via valuesFrom. Structurally verified identical to
+# `helm get values immich -n immich` (the live release's actual user-supplied values,
+# not the full computed default tree) at adoption time (2026-09-23) — edit this file and
+# merge, no other step needed, exactly as `helm upgrade -f` behaved before this.
 
 controllers:
   main:

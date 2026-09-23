@@ -1,15 +1,20 @@
-# Photo library storage (NFS) — not part of the immich-app chart release. Apply with:
-#   kubectl apply -f pvc.yaml -n immich
+# Photo library storage (NFS) — not part of the immich-app chart release. Flux-managed
+# (this directory, via the root flux-system Kustomization). Break-glass manual fallback if
+# Flux is suspended: kubectl apply -f clusters/raspberrypi/immich/pvc.yaml -n immich
 #
 # Split out of the combined immich-volumes.yaml on the Pi (which also has the Postgres
-# local-storage PV/PVC — see ../postgres/pvc.yaml for that half). Verified byte-identical
-# to /home/divyakumarjain/photos/immich/k3s/immich-volumes.yaml and
+# local-storage PV/PVC — see postgres/pvc.yaml at the repo root for that half). Verified
+# byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-volumes.yaml and
 # immich-infra/docs/audit-raw/raw-manifests/immich-volumes.yaml.
 
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: immich-nfs-pv
+  annotations:
+    # Flux-managed with prune: true; an accidental Git-side removal must not delete the
+    # live photo library PV. Same pattern as postgres/pvc.yaml and namespaces/namespaces.yaml.
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   capacity:
     storage: 1Ti
@@ -27,6 +32,8 @@ metadata:
   name: immich-nfs-pvc
   namespace: immich # not present in the source dump; added — this PVC is consumed by the
                       # immich-server pod in the immich namespace, no other namespace fits
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   accessModes:
   - ReadWriteMany

@@ -1,0 +1,13 @@
+# Source for the immich chart itself. Immich (ghcr.io/immich-app/immich-charts) publishes
+# a real, single, versioned OCI chart — unlike monitoring/, there's no local umbrella chart
+# here and no vendored dependency to keep in sync; Flux resolves this directly each time it
+# needs to pull the pinned version in helmrelease.yaml.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: immich
+  namespace: immich
+spec:
+  interval: 1h
+  type: oci
+  url: oci://ghcr.io/immich-app/immich-charts
