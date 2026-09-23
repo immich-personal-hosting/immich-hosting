@@ -15,10 +15,11 @@ metadata:
   name: immich
   annotations:
     kustomize.toolkit.fluxcd.io/prune: disabled
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cert-manager
-  annotations:
-    kustomize.toolkit.fluxcd.io/prune: disabled
+
+# cert-manager removed 2026-09-23: it was fully idle (no ClusterIssuer/Issuer/Certificate,
+# no Ingress referenced it anywhere — TLS is a deliberate, standing decision, not a
+# not-done-yet). Per the comment above, prune: disabled means removing this entry here does
+# NOT delete the live namespace on its own — that's a separate, deliberate
+# `kubectl delete namespace cert-manager`, done alongside `helm uninstall cert-manager` and
+# manually deleting its CRDs (the cert-manager chart sets helm.sh/resource-policy: keep on
+# them, so `helm uninstall` leaves them behind on purpose).

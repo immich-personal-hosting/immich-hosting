@@ -19,8 +19,9 @@ runs the apply command by hand.
 | Immich photo library storage (NFS) | raw manifest, Flux-managed via `clusters/raspberrypi/immich/` | `clusters/raspberrypi/immich/pvc.yaml` | Normally applied by Flux. Break-glass: `kubectl apply -f clusters/raspberrypi/immich/pvc.yaml` |
 | Postgres | raw manifest (not Helm), Flux-managed via `clusters/raspberrypi/postgres/` | `postgres/deployment.yaml`, `postgres/service.yaml`, `postgres/pvc.yaml` | Normally applied by Flux (`flux get kustomization postgres -n flux-system`). Break-glass manual fallback if Flux is suspended: `kubectl apply -f postgres/pvc.yaml -f postgres/service.yaml -f postgres/deployment.yaml` (note: **not** `-f postgres/`, which now also tries to apply `postgres/kustomization.yaml` itself and fails) |
 | Monitoring (Prometheus/Grafana/Loki/Promtail) | Helm (local chart, not published) | `monitoring/` | `helm dependency build monitoring && helm upgrade --install metrics monitoring -f monitoring/values.yaml -n monitoring` |
-| cert-manager | Helm (`oci://quay.io/jetstack/charts/cert-manager`) | `cert-manager/values.yaml` | `helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.21.0 -f cert-manager/values.yaml -n cert-manager` (chart `cert-manager-v1.21.0`, confirmed with `helm list`) |
 | Traefik | k3s-bundled (installed automatically by k3s itself, not by this repo) | — | — |
+
+**cert-manager was removed 2026-09-23** — it was fully idle (no `ClusterIssuer`/`Issuer`/`Certificate` anywhere, no `Ingress` referenced it). TLS is a deliberate, standing decision, not a not-done-yet gap — see `clusters/raspberrypi/immich/ingress.yaml`'s TLS note. If TLS work resumes later, reinstall the same way Immich/Postgres were brought in: a Flux `HelmRelease`, not a manual `helm upgrade`.
 
 Every file above carries a header comment noting where it was verified from and any known
 gap that applies to it — read the file, not just this table, before running its command.
@@ -37,7 +38,6 @@ Everything below is specific to this installation. If you rebuild it on other ha
 | Hostnames `immich.raspberrypi`, `grafana.raspberrypi` | `clusters/raspberrypi/immich/ingress.yaml`, `monitoring/templates/grafana-ingress.yaml` (also mentioned in the NetworkPolicy comments) | Must resolve on your LAN to a node IP running Traefik. Change the `host:` lines. |
 | Flux directory `clusters/raspberrypi` and the Git repository URL | `clusters/raspberrypi/flux-system/gotk-sync.yaml` (`spec.path`, and the GitRepository `spec.url` / `branch`) | Rename the directory to suit the new cluster, and re-run `flux bootstrap` pointing at your own repository and that path. |
 | SOPS/age recipient `age10j22...` | `.sops.yaml` and every `*.enc.yaml` in `clusters/*/secrets/` | Generate your own key with `age-keygen`, put its **public** key in `.sops.yaml`, **re-create every secret** encrypted to it (`sops -e`), and give the cluster the private key as the `sops-age` Secret in `flux-system`. The existing `*.enc.yaml` files cannot be re-keyed (`sops updatekeys` needs to decrypt them first) and are unreadable without this installation's private key, so they must be replaced with your own values. |
-| Flannel gateway `10.42.0.0/32` | `clusters/raspberrypi/network-policies/cert-manager.yaml` (`allow-apiserver-to-webhook`) | The control-plane node's flannel address, i.e. the source the API server appears from when it calls a pod on the *other* node. On the control-plane node: `ip -4 addr show flannel.1` (use the address as a `/32`). |
 
 ### Choosing the Postgres data path
 
@@ -72,11 +72,12 @@ Built by comparing two independently-audited sources and confirming they matched
    the actual chart/manifest source files used with `kubectl apply -f` / `helm upgrade`.
 
 Every raw manifest and the monitoring chart were diffed byte-for-byte between these two
-sources and found identical. The Immich and cert-manager Helm chart identities (`oci://...`
-registry paths) came from `raspberrypi`'s shell history, since neither is recorded in
-cluster state. (Immich's chart version is now pinned explicitly in
-`clusters/raspberrypi/immich/helmrelease.yaml`; an earlier, unused local wrapper chart
-that also pinned it, `immich/Chart.yaml`, was deleted when Immich moved under Flux.)
+sources and found identical. Immich's Helm chart identity (`oci://...` registry path) came
+from `raspberrypi`'s shell history, since it wasn't recorded in cluster state. (Immich's
+chart version is now pinned explicitly in `clusters/raspberrypi/immich/helmrelease.yaml`;
+an earlier, unused local wrapper chart that also pinned it, `immich/Chart.yaml`, was
+deleted when Immich moved under Flux. cert-manager's chart identity was the same story,
+until cert-manager itself was removed — see the Components table above.)
 
 The Postgres `Service` (`postgres/service.yaml`) was never saved as a file on the Pi — it
 was applied via an inline `kubectl apply -f - <<EOF` heredoc — and was recovered verbatim
