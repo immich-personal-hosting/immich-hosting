@@ -11,7 +11,7 @@ Scope: the Pi (`raspberrypi`), the only k3s server, is lost or its SD card is de
 | Survives on `omv` | Recreated from Git | **Lost / must be provided** |
 |---|---|---|
 | Photo library, DB dumps (NFS export) | Everything Flux manages: monitoring release, secrets, network policies, dashboards, **Postgres** (`clusters/raspberrypi/postgres/`), **Immich** (`clusters/raspberrypi/immich/`, Helm release + raw manifests) — see `flux get all -A` for the current object count | The **SOPS age private key** (see step 0.1) |
-| Grafana and Prometheus data (NFS) | The `cert-manager` Helm release (values in the repo) — the one component still hand-applied, see step 6 | (nothing else: Flux needs **no GitHub credential**, see step 5) |
+| Grafana and Prometheus data (NFS) | Nothing is hand-applied anymore (cert-manager was removed 2026-09-23, having been fully idle — see step 6) | (nothing else: Flux needs **no GitHub credential**, see step 5) |
 | Postgres data (`…/k8s/immich-postgres` on omv) | | The k3s **server token and CA** (new ones are issued) |
 | Loki's old data directory (see 6.3) | | Helm release history (irrelevant on a fresh cluster) |
 
@@ -75,10 +75,13 @@ This wipes only the agent's own state, so **container images are re-pulled** the
 
 > **Do not run `flux bootstrap`.** It regenerates `clusters/raspberrypi/flux-system/gotk-sync.yaml` and pushes it, which **deletes the hand-added `decryption:` block** ("Manually added (not flux-generated)"). Flux would then be unable to decrypt every `*.enc.yaml` secret. It would also re-add a GitHub `secretRef` that is no longer needed. Apply the manifests already in Git instead. [V: the block is in `gotk-sync.yaml` today]
 
-Create the namespaces the repo does not define (nothing in Git creates `monitoring`, `immich` or `cert-manager`; all three were made by hand) [V]. If a `clusters/raspberrypi/namespaces/` directory exists in Git, Flux creates them and you can skip this line:
+Create the namespaces the repo does not define (nothing in Git creates `monitoring` or
+`immich`; both were made by hand — `cert-manager`'s namespace no longer exists, it was
+removed 2026-09-23) [V]. If a `clusters/raspberrypi/namespaces/` directory exists in Git,
+Flux creates them and you can skip this line:
 
 ```sh
-kubectl create namespace monitoring; kubectl create namespace immich; kubectl create namespace cert-manager
+kubectl create namespace monitoring; kubectl create namespace immich
 ```
 
 Then (from a checkout of the repo): [D]
@@ -97,17 +100,16 @@ kubectl apply -f clusters/raspberrypi/flux-system/gotk-sync.yaml
 flux get all -A                                               # wait for flux-system and metrics to become Ready
 ```
 
-Flux then creates: the `metrics` HelmRelease (Grafana, Prometheus, Loki, Promtail; the chart is built from Git), the Secrets (`metrics-grafana`, `immich-postgres-credentials`), the NetworkPolicies, and the dashboards. `flux reconcile source git flux-system` and `flux reconcile kustomization flux-system` speed it up.
+Flux then creates: the `metrics` HelmRelease (Grafana, Prometheus, Loki, Promtail; the chart is built from Git), the `postgres` Kustomization and `immich` HelmRelease (see below), the Secrets (`metrics-grafana`, `immich-postgres-credentials`), the NetworkPolicies, and the dashboards. `flux reconcile source git flux-system` and `flux reconcile kustomization flux-system` speed it up.
 
-## 6. The layer still applied by hand (not Flux) [D]
+## 6. Nothing is applied by hand anymore [D]
 
-As of 2026-09-23, only cert-manager is left here — Postgres and Immich moved under Flux
+As of 2026-09-23, every component is Flux-managed — Postgres and Immich moved under Flux
 (`clusters/raspberrypi/postgres/`, `clusters/raspberrypi/immich/`) and recreate themselves
-automatically once Flux reconciles; no manual `kubectl apply`/`helm upgrade` needed for
-either on a rebuild.
-
-1. **cert-manager** (chart `v1.21.0`, values `crds.enabled: true`, matching `cert-manager/values.yaml`) [V]:
-   `helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.21.0 -n cert-manager -f cert-manager/values.yaml`
+automatically once Flux reconciles, and cert-manager (the last hand-applied piece) was
+removed entirely, having been fully idle (no `ClusterIssuer`/`Issuer`/`Certificate`, no
+`Ingress` referenced it — TLS is a deliberate, standing decision). No manual
+`kubectl apply`/`helm upgrade` is needed for anything on a rebuild.
 
 **Postgres-before-Immich ordering on a fresh rebuild:** Flux has no `dependsOn` linking
 these two — a `Kustomization` can only depend on another `Kustomization`, and a
@@ -124,7 +126,7 @@ Traefik, CoreDNS, `local-path` and metrics-server come with k3s and reappear on 
 ## 7. Verify
 
 - `kubectl get nodes` (both Ready) and `flux get all -A` (everything Ready).
-- `helm list -A`: `cert-manager`, `immich`, `metrics` (and the k3s-managed `traefik`, `traefik-crd`) — `immich` now shows as installed/upgraded by `helm-controller`, not by a human, but still appears here the same way.
+- `helm list -A`: `immich`, `metrics` (and the k3s-managed `traefik`, `traefik-crd`) — `immich` now shows as installed/upgraded by `helm-controller`, not by a human, but still appears here the same way. No `cert-manager` release (removed 2026-09-23).
 - All pods Running; Prometheus shows its 19 targets up; the three Grafana dashboards are listed in "Immich Hosting".
 - `curl -H 'Host: immich.raspberrypi' http://192.168.1.161/api/server/ping` returns `{"res":"pong"}`; the server log shows ML healthy and no database errors.
 - The asset count matches what you expect (79,113-ish); the nightly dump appears the next morning.
@@ -150,7 +152,8 @@ Out of scope: the photos, database dumps and Grafana/Prometheus data exist only 
 
 - **`flux bootstrap`** removes the SOPS decryption block; use step 5. **`k3s-agent-uninstall.sh`** deletes Loki's data; use step 4.
 - **Template changes need a chart version bump** (`monitoring/Chart.yaml`), otherwise Flux keeps deploying its old cached chart. (Changes to the HelmRelease's inlined `spec.values` do not.)
-- **Postgres and Immich are Flux-managed** (as of 2026-09-23; `clusters/raspberrypi/postgres/`, `clusters/raspberrypi/immich/`) — `cert-manager` remains the one component still applied by hand (`helm upgrade`). Postgres's `Kustomization` was adopted deliberately staged (`suspend: true`, verified with a server-side dry-run diff, then flipped) because its `Deployment` uses `Recreate` strategy against a stateful, node-local volume — see `clusters/raspberrypi/postgres/README.md`.
+- **Postgres and Immich are Flux-managed** (as of 2026-09-23; `clusters/raspberrypi/postgres/`, `clusters/raspberrypi/immich/`). Postgres's `Kustomization` was adopted deliberately staged (`suspend: true`, verified with a server-side dry-run diff, then flipped) because its `Deployment` uses `Recreate` strategy against a stateful, node-local volume — see `clusters/raspberrypi/postgres/README.md`.
+- **cert-manager was removed** (2026-09-23), not just left idle: `helm uninstall`, then its CRDs by hand (`helm.sh/resource-policy: keep` means `helm uninstall` leaves them behind on purpose), then `kubectl delete namespace cert-manager` (its namespace entry in Git carried `prune: disabled`, so removing it from Git alone would never have deleted the live namespace — same as every other namespace in `namespaces/namespaces.yaml`).
 - `flux suspend` is not reliable here: the Kustomization re-applies `suspend: false` from Git within minutes.
 - **Removing a field from Git does not always remove it from the cluster.** Flux applies with server-side apply, and a field owned by *two* managers survives when one of them stops applying it. This bit us when dropping Flux's GitHub token (2026-09-20): `spec.secretRef` on the GitRepository was co-owned by `kustomize-controller` and the `flux` bootstrap CLI, so merging the change did nothing until the field was removed by hand (`kubectl patch ... --type=json -p '[{"op":"remove","path":"/spec/secretRef"}]'`). Check who owns a field with `kubectl get <kind> <name> -o json --show-managed-fields` (kubectl hides them by default), and preview what Flux would do with `kubectl diff --server-side --field-manager=kustomize-controller -f <file>`: plain `kubectl diff` uses client-side logic and shows nothing for such a removal.
 - Rate windows in Grafana must stay at a fixed 5m (Prometheus scrapes about once a minute).
