@@ -8,9 +8,10 @@
 # ChartVersion strategy, there is no Chart.yaml to forget to bump: bumping the Immich
 # version means editing this one field and merging, nothing else.
 #
-# Deliberately created with suspend: true. Verify with `helm template` against this pinned
-# chart+values, diffed against `kubectl get -o yaml` of the live release, before flipping to
-# suspend: false in a separate, explicit follow-up.
+# Was created suspend: true (PR #31), hit a blocking namespace bug on the ConfigMap this
+# reads values from (PR #32 fixed it), then re-verified clean: `helm template` (this pinned
+# chart+values) vs. `helm get manifest immich` byte-identical aside from trailing
+# whitespace, immediately before flipping to suspend: false here.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -18,7 +19,7 @@ metadata:
   namespace: immich
 spec:
   interval: 30m
-  suspend: true
+  suspend: false
   releaseName: immich
   chart:
     spec:
