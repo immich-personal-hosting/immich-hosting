@@ -10,9 +10,9 @@ Scope: the Pi (`raspberrypi`), the only k3s server, is lost or its SD card is de
 
 | Survives on `omv` | Recreated from Git | **Lost / must be provided** |
 |---|---|---|
-| Photo library, DB dumps (NFS export) | Everything Flux manages (53 objects: monitoring release, secrets, network policies, dashboards) | The **SOPS age private key** (see step 0.1) |
-| Grafana and Prometheus data (NFS) | The 8 hand-applied manifests (`immich/`, `postgres/`) | (nothing else: Flux needs **no GitHub credential**, see step 5) |
-| Postgres data (`…/k8s/immich-postgres` on omv) | Helm releases `immich`, `cert-manager` (values in the repo) | The k3s **server token and CA** (new ones are issued) |
+| Photo library, DB dumps (NFS export) | Everything Flux manages: monitoring release, secrets, network policies, dashboards, **Postgres** (`clusters/raspberrypi/postgres/`), **Immich** (`clusters/raspberrypi/immich/`, Helm release + raw manifests) — see `flux get all -A` for the current object count | The **SOPS age private key** (see step 0.1) |
+| Grafana and Prometheus data (NFS) | The `cert-manager` Helm release (values in the repo) — the one component still hand-applied, see step 6 | (nothing else: Flux needs **no GitHub credential**, see step 5) |
+| Postgres data (`…/k8s/immich-postgres` on omv) | | The k3s **server token and CA** (new ones are issued) |
 | Loki's old data directory (see 6.3) | | Helm release history (irrelevant on a fresh cluster) |
 
 **The database moved to `omv` on 2026-09-20** (`postgres/MIGRATION-TO-OMV.md`), so a Pi loss no longer takes it with it. (Until the old copy on the Pi is decommissioned it still exists there, but do not rely on it.) If Postgres is ever on the Pi's SD card again, a Pi loss also loses the database: restore the latest nightly dump (section 8.1), up to about 24 hours of changes.
@@ -99,23 +99,32 @@ flux get all -A                                               # wait for flux-sy
 
 Flux then creates: the `metrics` HelmRelease (Grafana, Prometheus, Loki, Promtail; the chart is built from Git), the Secrets (`metrics-grafana`, `immich-postgres-credentials`), the NetworkPolicies, and the dashboards. `flux reconcile source git flux-system` and `flux reconcile kustomization flux-system` speed it up.
 
-## 6. The layer that is applied by hand (not Flux), in this order [D]
+## 6. The layer still applied by hand (not Flux) [D]
+
+As of 2026-09-23, only cert-manager is left here — Postgres and Immich moved under Flux
+(`clusters/raspberrypi/postgres/`, `clusters/raspberrypi/immich/`) and recreate themselves
+automatically once Flux reconciles; no manual `kubectl apply`/`helm upgrade` needed for
+either on a rebuild.
 
 1. **cert-manager** (chart `v1.21.0`, values `crds.enabled: true`, matching `cert-manager/values.yaml`) [V]:
    `helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.21.0 -n cert-manager -f cert-manager/values.yaml`
-2. **Immich storage and ingress:** `kubectl apply -f immich/pvc.yaml -f immich/ingress.yaml`
-3. **Postgres:** confirm the data directory on `omv` still exists (run the preflight in the README), then
-   `kubectl apply -f postgres/pvc.yaml -f postgres/service.yaml -f postgres/deployment.yaml`.
-   It should start with a normal crash recovery (the old pod was killed abruptly); check the log, then compare row counts with your last known numbers.
-4. **Immich (Helm), last:**
-   `helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich --version 0.13.1 -n immich -f immich/values.yaml`
+
+**Postgres-before-Immich ordering on a fresh rebuild:** Flux has no `dependsOn` linking
+these two — a `Kustomization` can only depend on another `Kustomization`, and a
+`HelmRelease` only on another `HelmRelease`, so there's no field that can connect
+`postgres`'s `Kustomization` to `immich`'s `HelmRelease` directly. In practice this
+self-heals: the Immich server's readiness/liveness probes fail until Postgres is
+reachable, and it retries on its own. To be deliberate about it instead: before
+reconciling on a rebuild, set `clusters/raspberrypi/immich/helmrelease.yaml`'s
+`suspend: true`, wait for `flux get kustomization postgres` to report `Ready`, then flip
+it back to `false` — the same staging technique used to originally adopt it.
 
 Traefik, CoreDNS, `local-path` and metrics-server come with k3s and reappear on their own. [V: cluster inventory]
 
 ## 7. Verify
 
 - `kubectl get nodes` (both Ready) and `flux get all -A` (everything Ready).
-- `helm list -A`: `cert-manager`, `immich`, `metrics` (and the k3s-managed `traefik`, `traefik-crd`).
+- `helm list -A`: `cert-manager`, `immich`, `metrics` (and the k3s-managed `traefik`, `traefik-crd`) — `immich` now shows as installed/upgraded by `helm-controller`, not by a human, but still appears here the same way.
 - All pods Running; Prometheus shows its 19 targets up; the three Grafana dashboards are listed in "Immich Hosting".
 - `curl -H 'Host: immich.raspberrypi' http://192.168.1.161/api/server/ping` returns `{"res":"pong"}`; the server log shows ML healthy and no database errors.
 - The asset count matches what you expect (79,113-ish); the nightly dump appears the next morning.
@@ -129,7 +138,7 @@ The database is gone with the SD card. Restore the newest dump from `omv:/export
 The encrypted secrets are unreadable and must be replaced, not decrypted:
 1. `age-keygen -o new.key`; put the **public** key in `.sops.yaml`; create the `sops-age` Secret from `new.key`.
 2. Re-create `grafana-admin.enc.yaml` and `postgres.enc.yaml` with **new** passwords (`sops -e`), commit, let Flux apply them.
-3. Grafana's database already holds the old admin password: reset it with `grafana cli admin reset-admin-password --password-from-stdin` in the pod. Postgres already holds the old role password: change it with `ALTER ROLE postgres PASSWORD …` over the local socket (trust auth) so the database matches the new Secret. Then re-run the Immich `helm upgrade`.
+3. Grafana's database already holds the old admin password: reset it with `grafana cli admin reset-admin-password --password-from-stdin` in the pod. Postgres already holds the old role password: change it with `ALTER ROLE postgres PASSWORD …` over the local socket (trust auth) so the database matches the new Secret. Immich is Flux-managed now, so there's no manual `helm upgrade` to re-run — `flux reconcile helmrelease immich -n immich` if you don't want to wait for the next poll.
 
 ### 8.3 Loki's logs
 Loki's volume is a `local-path` directory on `omv` under `/var/lib/rancher/k3s/storage/pvc-…_monitoring_storage-metrics-loki-0`. The rebuilt cluster creates a **new** volume, so the old logs (30 days at most) are orphaned but still on disk. Recover them only if they matter, by creating a `local` PV that points at the old directory before Loki starts; otherwise delete the old directory later. [V: path from the live PV]
@@ -141,7 +150,7 @@ Out of scope: the photos, database dumps and Grafana/Prometheus data exist only 
 
 - **`flux bootstrap`** removes the SOPS decryption block; use step 5. **`k3s-agent-uninstall.sh`** deletes Loki's data; use step 4.
 - **Template changes need a chart version bump** (`monitoring/Chart.yaml`), otherwise Flux keeps deploying its old cached chart. (Changes to the HelmRelease's inlined `spec.values` do not.)
-- **Postgres and Immich are not managed by Flux**: their changes are applied by hand (`kubectl apply`, `helm upgrade`).
+- **Postgres and Immich are Flux-managed** (as of 2026-09-23; `clusters/raspberrypi/postgres/`, `clusters/raspberrypi/immich/`) — `cert-manager` remains the one component still applied by hand (`helm upgrade`). Postgres's `Kustomization` was adopted deliberately staged (`suspend: true`, verified with a server-side dry-run diff, then flipped) because its `Deployment` uses `Recreate` strategy against a stateful, node-local volume — see `clusters/raspberrypi/postgres/README.md`.
 - `flux suspend` is not reliable here: the Kustomization re-applies `suspend: false` from Git within minutes.
 - **Removing a field from Git does not always remove it from the cluster.** Flux applies with server-side apply, and a field owned by *two* managers survives when one of them stops applying it. This bit us when dropping Flux's GitHub token (2026-09-20): `spec.secretRef` on the GitRepository was co-owned by `kustomize-controller` and the `flux` bootstrap CLI, so merging the change did nothing until the field was removed by hand (`kubectl patch ... --type=json -p '[{"op":"remove","path":"/spec/secretRef"}]'`). Check who owns a field with `kubectl get <kind> <name> -o json --show-managed-fields` (kubectl hides them by default), and preview what Flux would do with `kubectl diff --server-side --field-manager=kustomize-controller -f <file>`: plain `kubectl diff` uses client-side logic and shows nothing for such a removal.
 - Rate windows in Grafana must stay at a fixed 5m (Prometheus scrapes about once a minute).

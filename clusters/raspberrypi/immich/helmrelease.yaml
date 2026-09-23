@@ -1,0 +1,42 @@
+# Adopts the existing, live `immich` Helm release (previously applied by hand:
+#   helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich
+#     --version 0.13.1 -f immich/values.yaml -n immich
+# — see README.md in this directory for why this went straight at the upstream OCI chart
+# rather than finishing the old local wrapper chart, which is now deleted).
+#
+# `chart.spec.version` is pinned explicitly here — unlike monitoring's local-chart
+# ChartVersion strategy, there is no Chart.yaml to forget to bump: bumping the Immich
+# version means editing this one field and merging, nothing else.
+#
+# Deliberately created with suspend: true. Verify with `helm template` against this pinned
+# chart+values, diffed against `kubectl get -o yaml` of the live release, before flipping to
+# suspend: false in a separate, explicit follow-up.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich
+  namespace: immich
+spec:
+  interval: 30m
+  suspend: true
+  releaseName: immich
+  chart:
+    spec:
+      chart: immich
+      version: "0.13.1"
+      sourceRef:
+        kind: HelmRepository
+        name: immich
+        namespace: immich
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: immich-values
+      # valuesKey defaults to "values.yaml", which is exactly the key
+      # kustomization.yaml's configMapGenerator produces from values.yaml in this
+      # directory — no override needed.

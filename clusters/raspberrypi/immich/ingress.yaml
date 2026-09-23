@@ -1,5 +1,6 @@
-# Raw manifests (not part of the immich-app chart release) — apply with:
-#   kubectl apply -f ingress.yaml -n immich
+# Raw manifests (not part of the immich-app chart release). Flux-managed (this directory,
+# via the root flux-system Kustomization). Break-glass manual fallback if Flux is
+# suspended: kubectl apply -f clusters/raspberrypi/immich/ingress.yaml -n immich
 #
 # Verified byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-ingress.yaml on
 # raspberrypi and immich-infra/docs/audit-raw/raw-manifests/immich-ingress.yaml.

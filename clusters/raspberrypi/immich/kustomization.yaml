@@ -1,0 +1,19 @@
+# Everything Immich-related that Flux manages lives in this one directory: the Helm
+# source/release, the values that feed it, and the two raw manifests (photo library PVC,
+# ingress) that were never part of the chart. No split between "chart source at the repo
+# root" and "control objects under clusters/" the way monitoring/ has — there's no manual
+# fallback command left that needs the chart at a fixed repo-root path, so there's no
+# reason for one.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - helmrepository.yaml
+  - helmrelease.yaml
+  - pvc.yaml
+  - ingress.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: immich-values
+    files:
+      - values.yaml

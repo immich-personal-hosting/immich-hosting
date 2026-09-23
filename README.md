@@ -14,9 +14,9 @@ runs the apply command by hand.
 
 | Component | Type | Path | Apply command |
 |---|---|---|---|
-| Immich | Helm (`oci://ghcr.io/immich-app/immich-charts/immich`) | `immich/` | `helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich --version 0.13.1 -f immich/values.yaml -n immich` (chart `immich-0.13.1`, confirmed with `helm list` on 2026-09-20) |
-| Immich ingress + middleware | raw manifest | `immich/ingress.yaml` | `kubectl apply -f immich/ingress.yaml` |
-| Immich photo library storage (NFS) | raw manifest | `immich/pvc.yaml` | `kubectl apply -f immich/pvc.yaml` |
+| Immich | Helm (`oci://ghcr.io/immich-app/immich-charts/immich`), Flux-managed via `clusters/raspberrypi/immich/` | `clusters/raspberrypi/immich/` | Normally applied by Flux (`flux get helmrelease immich -n immich`). Break-glass manual fallback if Flux is suspended: `helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich --version 0.13.1 -f clusters/raspberrypi/immich/values.yaml -n immich` (chart `immich-0.13.1`) |
+| Immich ingress + middleware | raw manifest, Flux-managed via `clusters/raspberrypi/immich/` | `clusters/raspberrypi/immich/ingress.yaml` | Normally applied by Flux. Break-glass: `kubectl apply -f clusters/raspberrypi/immich/ingress.yaml` |
+| Immich photo library storage (NFS) | raw manifest, Flux-managed via `clusters/raspberrypi/immich/` | `clusters/raspberrypi/immich/pvc.yaml` | Normally applied by Flux. Break-glass: `kubectl apply -f clusters/raspberrypi/immich/pvc.yaml` |
 | Postgres | raw manifest (not Helm), Flux-managed via `clusters/raspberrypi/postgres/` | `postgres/deployment.yaml`, `postgres/service.yaml`, `postgres/pvc.yaml` | Normally applied by Flux (`flux get kustomization postgres -n flux-system`). Break-glass manual fallback if Flux is suspended: `kubectl apply -f postgres/pvc.yaml -f postgres/service.yaml -f postgres/deployment.yaml` (note: **not** `-f postgres/`, which now also tries to apply `postgres/kustomization.yaml` itself and fails) |
 | Monitoring (Prometheus/Grafana/Loki/Promtail) | Helm (local chart, not published) | `monitoring/` | `helm dependency build monitoring && helm upgrade --install metrics monitoring -f monitoring/values.yaml -n monitoring` |
 | cert-manager | Helm (`oci://quay.io/jetstack/charts/cert-manager`) | `cert-manager/values.yaml` | `helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.21.0 -f cert-manager/values.yaml -n cert-manager` (chart `cert-manager-v1.21.0`, confirmed with `helm list`) |
@@ -33,8 +33,8 @@ Everything below is specific to this installation. If you rebuild it on other ha
 |---|---|---|
 | Node names `omv`, `raspberrypi` | `postgres/deployment.yaml` (`nodeSelector`), `postgres/pvc.yaml` (PV `nodeAffinity`), and the `server:` of every NFS PV | `kubectl get nodes`. `omv` is the storage node (photos, and Postgres data); `raspberrypi` is the control-plane node. |
 | **Postgres data path** `/srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329/k8s/immich-postgres` | **`postgres/pvc.yaml` -> `spec.local.path`** (the only place it is defined; the runbook's `RAW` variable repeats the prefix) | See "Choosing the Postgres data path" below. |
-| NFS server `omv` and export paths `/export/storage/Personal/Immich`, `/export/storage/metrics/grafana`, `/export/storage/metrics/prometheus` | `immich/pvc.yaml`, `monitoring/templates/grafana-data-pv.yaml`, `monitoring/templates/prometheus-data-pv.yaml` | On the NFS server: `sudo exportfs -v`. Create each subdirectory first; Grafana runs as uid 472 and Prometheus as uid 65534, so the directory must be writable by them. |
-| Hostnames `immich.raspberrypi`, `grafana.raspberrypi` | `immich/ingress.yaml`, `monitoring/templates/grafana-ingress.yaml` (also mentioned in the NetworkPolicy comments) | Must resolve on your LAN to a node IP running Traefik. Change the `host:` lines. |
+| NFS server `omv` and export paths `/export/storage/Personal/Immich`, `/export/storage/metrics/grafana`, `/export/storage/metrics/prometheus` | `clusters/raspberrypi/immich/pvc.yaml`, `monitoring/templates/grafana-data-pv.yaml`, `monitoring/templates/prometheus-data-pv.yaml` | On the NFS server: `sudo exportfs -v`. Create each subdirectory first; Grafana runs as uid 472 and Prometheus as uid 65534, so the directory must be writable by them. |
+| Hostnames `immich.raspberrypi`, `grafana.raspberrypi` | `clusters/raspberrypi/immich/ingress.yaml`, `monitoring/templates/grafana-ingress.yaml` (also mentioned in the NetworkPolicy comments) | Must resolve on your LAN to a node IP running Traefik. Change the `host:` lines. |
 | Flux directory `clusters/raspberrypi` and the Git repository URL | `clusters/raspberrypi/flux-system/gotk-sync.yaml` (`spec.path`, and the GitRepository `spec.url` / `branch`) | Rename the directory to suit the new cluster, and re-run `flux bootstrap` pointing at your own repository and that path. |
 | SOPS/age recipient `age10j22...` | `.sops.yaml` and every `*.enc.yaml` in `clusters/*/secrets/` | Generate your own key with `age-keygen`, put its **public** key in `.sops.yaml`, **re-create every secret** encrypted to it (`sops -e`), and give the cluster the private key as the `sops-age` Secret in `flux-system`. The existing `*.enc.yaml` files cannot be re-keyed (`sops updatekeys` needs to decrypt them first) and are unreadable without this installation's private key, so they must be replaced with your own values. |
 | Flannel gateway `10.42.0.0/32` | `clusters/raspberrypi/network-policies/cert-manager.yaml` (`allow-apiserver-to-webhook`) | The control-plane node's flannel address, i.e. the source the API server appears from when it calls a pod on the *other* node. On the control-plane node: `ip -4 addr show flannel.1` (use the address as a `/32`). |
@@ -74,7 +74,9 @@ Built by comparing two independently-audited sources and confirming they matched
 Every raw manifest and the monitoring chart were diffed byte-for-byte between these two
 sources and found identical. The Immich and cert-manager Helm chart identities (`oci://...`
 registry paths) came from `raspberrypi`'s shell history, since neither is recorded in
-cluster state or in a committed `Chart.yaml` — see the version caveat in `immich/Chart.yaml`.
+cluster state. (Immich's chart version is now pinned explicitly in
+`clusters/raspberrypi/immich/helmrelease.yaml`; an earlier, unused local wrapper chart
+that also pinned it, `immich/Chart.yaml`, was deleted when Immich moved under Flux.)
 
 The Postgres `Service` (`postgres/service.yaml`) was never saved as a file on the Pi — it
 was applied via an inline `kubectl apply -f - <<EOF` heredoc — and was recovered verbatim
@@ -96,5 +98,8 @@ reference/rollback. Not the current deployment — see `legacy/docker-swarm/READ
 
 ## Secrets
 
-Nothing in this repo is a real secret — see `secrets/README.md` for the intended
-SOPS-based pattern, which isn't wired up yet.
+Real secrets are SOPS/age-encrypted at `clusters/raspberrypi/secrets/*.enc.yaml`, applied
+by Flux directly — see `clusters/raspberrypi/secrets/README.md` for how decryption works,
+how to edit or add one, and recovery if the cluster's `sops-age` Secret is ever lost.
+(`secrets/README.md` at the repo root is a superseded pre-implementation doc, kept only as
+a pointer to the above.)
