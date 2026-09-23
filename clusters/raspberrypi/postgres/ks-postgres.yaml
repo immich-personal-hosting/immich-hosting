@@ -1,0 +1,36 @@
+# Adopts the existing, live Postgres Deployment/PVC/Service (postgres/ at the repo root,
+# unmoved — see clusters/raspberrypi/postgres/README.md for why) under Flux management.
+#
+# Deliberately created with suspend: true. Postgres's Deployment uses `Recreate` strategy
+# against a node-local, stateful volume: any field mismatch on first Flux takeover (a
+# kustomize-controller server-side-apply co-owning fields previously owned only by
+# kubectl's client-side apply) risks an actual, if brief, pod restart. suspend: true means
+# merging this file changes nothing live yet — a human verifies
+# `kubectl diff --server-side --field-manager=kustomize-controller -f postgres/pvc.yaml -f
+# postgres/service.yaml -f postgres/deployment.yaml` is empty first, then flips this to
+# `suspend: false` in a separate, explicit follow-up.
+#
+# No `decryption:` block: the Postgres credentials Secret (immich-postgres-credentials)
+# already lives under clusters/raspberrypi/secrets/, applied by the root flux-system
+# Kustomization, which already has the sops-age decryption block. This Kustomization only
+# needs to reference the Secret by name (postgres/deployment.yaml does, via secretKeyRef).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: postgres
+  namespace: flux-system
+spec:
+  interval: 10m
+  suspend: true
+  path: ./postgres
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  timeout: 3m
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: immich-postgres
+      namespace: immich
