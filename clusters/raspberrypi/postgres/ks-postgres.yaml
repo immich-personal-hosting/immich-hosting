@@ -1,14 +1,13 @@
 # Adopts the existing, live Postgres Deployment/PVC/Service (postgres/ at the repo root,
 # unmoved — see clusters/raspberrypi/postgres/README.md for why) under Flux management.
 #
-# Deliberately created with suspend: true. Postgres's Deployment uses `Recreate` strategy
+# Was created suspend: true (PR #29). Postgres's Deployment uses `Recreate` strategy
 # against a node-local, stateful volume: any field mismatch on first Flux takeover (a
 # kustomize-controller server-side-apply co-owning fields previously owned only by
-# kubectl's client-side apply) risks an actual, if brief, pod restart. suspend: true means
-# merging this file changes nothing live yet — a human verifies
-# `kubectl diff --server-side --field-manager=kustomize-controller -f postgres/pvc.yaml -f
-# postgres/service.yaml -f postgres/deployment.yaml` is empty first, then flips this to
-# `suspend: false` in a separate, explicit follow-up.
+# kubectl's client-side apply) risks an actual, if brief, pod restart. Before flipping to
+# suspend: false here, `kubectl diff --server-side --field-manager=kustomize-controller -f
+# postgres/pvc.yaml -f postgres/service.yaml -f postgres/deployment.yaml` was re-confirmed
+# empty (aside from the prune annotations below) immediately beforehand.
 #
 # No `decryption:` block: the Postgres credentials Secret (immich-postgres-credentials)
 # already lives under clusters/raspberrypi/secrets/, applied by the root flux-system
@@ -21,7 +20,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 10m
-  suspend: true
+  suspend: false
   path: ./postgres
   prune: true
   sourceRef:
