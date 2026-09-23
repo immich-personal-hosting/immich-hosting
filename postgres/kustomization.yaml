@@ -1,0 +1,18 @@
+# Explicit resource list, not left to Flux's implicit recursive auto-generation, for two
+# reasons: (1) house style in this repo — every other Flux-adjacent directory
+# (clusters/raspberrypi/namespaces/, secrets/, network-policies/, dashboards/, monitoring/)
+# has an explicit kustomization.yaml naming exact resources, none rely on auto-discovery;
+# (2) MIGRATION-TO-OMV.md lives in this same directory and is not a manifest — an explicit
+# list keeps it (and anything added here later) out of what gets applied, on purpose,
+# rather than by relying on Flux's non-YAML-file skip behavior.
+#
+# NOTE: adding this file changes what `kubectl apply -f postgres/` does — it will now try
+# to apply this Kustomization object too, which the apiserver doesn't recognize, and fail.
+# Use the explicit per-file form instead (see README.md / docs/DISASTER-RECOVERY.md), which
+# is what both already used anyway.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
