@@ -17,7 +17,7 @@ runs the apply command by hand.
 | Immich | Helm (`oci://ghcr.io/immich-app/immich-charts/immich`), Flux-managed via `clusters/raspberrypi/immich/` | `clusters/raspberrypi/immich/` | Normally applied by Flux (`flux get helmrelease immich -n immich`). Break-glass manual fallback if Flux is suspended: `helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich --version 0.13.1 -f clusters/raspberrypi/immich/values.yaml -n immich` (chart `immich-0.13.1`) |
 | Immich ingress + middleware | raw manifest, Flux-managed via `clusters/raspberrypi/immich/` | `clusters/raspberrypi/immich/ingress.yaml` | Normally applied by Flux. Break-glass: `kubectl apply -f clusters/raspberrypi/immich/ingress.yaml` |
 | Immich photo library storage (NFS) | raw manifest, Flux-managed via `clusters/raspberrypi/immich/` | `clusters/raspberrypi/immich/pvc.yaml` | Normally applied by Flux. Break-glass: `kubectl apply -f clusters/raspberrypi/immich/pvc.yaml` |
-| Postgres | raw manifest (not Helm), Flux-managed via `clusters/raspberrypi/postgres/` | `postgres/deployment.yaml`, `postgres/service.yaml`, `postgres/pvc.yaml` | Normally applied by Flux (`flux get kustomization postgres -n flux-system`). Break-glass manual fallback if Flux is suspended: `kubectl apply -f postgres/pvc.yaml -f postgres/service.yaml -f postgres/deployment.yaml` (note: **not** `-f postgres/`, which now also tries to apply `postgres/kustomization.yaml` itself and fails) |
+| Postgres | raw manifest (not Helm), Flux-managed via `clusters/raspberrypi/postgres/` | `clusters/raspberrypi/postgres/{pvc,service,deployment}.yaml` | Normally applied by Flux (`flux get kustomization flux-system -n flux-system`). Break-glass: `kubectl apply -f clusters/raspberrypi/postgres/pvc.yaml -f clusters/raspberrypi/postgres/service.yaml -f clusters/raspberrypi/postgres/deployment.yaml` |
 | Monitoring (Prometheus/Grafana/Loki/Promtail) | Helm (local chart, not published) | `monitoring/` | `helm dependency build monitoring && helm upgrade --install metrics monitoring -f monitoring/values.yaml -n monitoring` |
 | Traefik | k3s-bundled (installed automatically by k3s itself, not by this repo) | — | — |
 
@@ -32,8 +32,8 @@ Everything below is specific to this installation. If you rebuild it on other ha
 
 | Value (as here) | Where it is used | How to find / what to change |
 |---|---|---|
-| Node names `omv`, `raspberrypi` | `postgres/deployment.yaml` (`nodeSelector`), `postgres/pvc.yaml` (PV `nodeAffinity`), and the `server:` of every NFS PV | `kubectl get nodes`. `omv` is the storage node (photos, and Postgres data); `raspberrypi` is the control-plane node. |
-| **Postgres data path** `/srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329/k8s/immich-postgres` | **`postgres/pvc.yaml` -> `spec.local.path`** (the only place it is defined; the runbook's `RAW` variable repeats the prefix) | See "Choosing the Postgres data path" below. |
+| Node names `omv`, `raspberrypi` | `clusters/raspberrypi/postgres/deployment.yaml` (`nodeSelector`), `clusters/raspberrypi/postgres/pvc.yaml` (PV `nodeAffinity`), and the `server:` of every NFS PV | `kubectl get nodes`. `omv` is the storage node (photos, and Postgres data); `raspberrypi` is the control-plane node. |
+| **Postgres data path** `/srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329/k8s/immich-postgres` | **`clusters/raspberrypi/postgres/pvc.yaml` -> `spec.local.path`** (the only place it is defined; the runbook's `RAW` variable repeats the prefix) | See "Choosing the Postgres data path" below. |
 | NFS server `omv` and export paths `/export/storage/Personal/Immich`, `/export/storage/metrics/grafana`, `/export/storage/metrics/prometheus` | `clusters/raspberrypi/immich/pvc.yaml`, `monitoring/templates/grafana-data-pv.yaml`, `monitoring/templates/prometheus-data-pv.yaml` | On the NFS server: `sudo exportfs -v`. Create each subdirectory first; Grafana runs as uid 472 and Prometheus as uid 65534, so the directory must be writable by them. |
 | Hostnames `immich.raspberrypi`, `grafana.raspberrypi` | `clusters/raspberrypi/immich/ingress.yaml`, `monitoring/templates/grafana-ingress.yaml` (also mentioned in the NetworkPolicy comments) | Must resolve on your LAN to a node IP running Traefik. Change the `host:` lines. |
 | Flux directory `clusters/raspberrypi` and the Git repository URL | `clusters/raspberrypi/flux-system/gotk-sync.yaml` (`spec.path`, and the GitRepository `spec.url` / `branch`) | Rename the directory to suit the new cluster, and re-run `flux bootstrap` pointing at your own repository and that path. |
@@ -41,7 +41,7 @@ Everything below is specific to this installation. If you rebuild it on other ha
 
 ### Choosing the Postgres data path
 
-`postgres/pvc.yaml` uses a `local` PV, so it needs an absolute path **on the node named in its `nodeAffinity`**. The path here is the raw mount of the SSD array that OpenMediaVault creates (`/srv/dev-disk-by-uuid-<filesystem UUID>`); the UUID is stable if the array is renumbered. If you replicate this on other hardware:
+`clusters/raspberrypi/postgres/pvc.yaml` uses a `local` PV, so it needs an absolute path **on the node named in its `nodeAffinity`**. The path here is the raw mount of the SSD array that OpenMediaVault creates (`/srv/dev-disk-by-uuid-<filesystem UUID>`); the UUID is stable if the array is renumbered. If you replicate this on other hardware:
 
 1. Pick a directory on the node's **fast, redundant local disk**, **not the boot/SD card**, and **not under any NFS export** (this installation exports `/export/storage` to the whole LAN with `no_root_squash`, so a database under it would be readable and writable by any LAN host).
 2. Create it with the ownership Postgres needs (uid/gid 999) and mode 700:
@@ -55,11 +55,11 @@ Everything below is specific to this installation. If you rebuild it on other ha
    echo "owner  : $(stat -c '%u:%g %a' "$D")   <- must be 999:999 700"
    for e in $(sudo exportfs -v | awk '/^\//{print $1}'); do case "$D/" in "$e"/*) echo "EXPOSED under NFS export $e";; esac; done   # must print nothing
    ```
-4. Put the path in `postgres/pvc.yaml` under `spec.local.path`, and make `nodeAffinity` and `postgres/deployment.yaml`'s `nodeSelector` name the same node.
+4. Put the path in `clusters/raspberrypi/postgres/pvc.yaml` under `spec.local.path`, and make `nodeAffinity` and `clusters/raspberrypi/postgres/deployment.yaml`'s `nodeSelector` name the same node.
 
 Safety property to keep: the directory should live on the data disk itself (a subdirectory of that disk's mount). If the disk fails to mount at boot, the directory then does not exist and the pod refuses to start, instead of silently writing the database to the SD card.
 
-See `postgres/MIGRATION-TO-OMV.md` for how the data was moved and how to roll back.
+See `clusters/raspberrypi/postgres/MIGRATION-TO-OMV.md` for how the data was moved and how to roll back.
 
 **Rebuilding the control plane** (the Raspberry Pi: it is the only k3s server and its state has no backup) is documented in `docs/DISASTER-RECOVERY.md`: what survives, what must be provided (the SOPS age key, a GitHub token), and the order to bring everything back from Git.
 
@@ -79,7 +79,7 @@ an earlier, unused local wrapper chart that also pinned it, `immich/Chart.yaml`,
 deleted when Immich moved under Flux. cert-manager's chart identity was the same story,
 until cert-manager itself was removed — see the Components table above.)
 
-The Postgres `Service` (`postgres/service.yaml`) was never saved as a file on the Pi — it
+The Postgres `Service` (`clusters/raspberrypi/postgres/service.yaml`) was never saved as a file on the Pi — it
 was applied via an inline `kubectl apply -f - <<EOF` heredoc — and was recovered verbatim
 from shell history rather than reconstructed from scratch.
 
