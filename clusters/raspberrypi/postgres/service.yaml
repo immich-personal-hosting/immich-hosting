@@ -1,5 +1,5 @@
-# Not Helm-managed. Apply with:
-#   kubectl apply -f service.yaml -n immich
+# Not Helm-managed. Flux-managed (this directory, via the root flux-system Kustomization).
+# Break-glass manual fallback if Flux is suspended: kubectl apply -f service.yaml -n immich
 #
 # Recovered verbatim from a `kubectl apply -f - <<EOF ... EOF` heredoc in raspberrypi's shell
 # history — this Service was applied inline and never saved as a file on the Pi, unlike the

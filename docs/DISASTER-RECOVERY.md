@@ -15,7 +15,7 @@ Scope: the Pi (`raspberrypi`), the only k3s server, is lost or its SD card is de
 | Postgres data (`…/k8s/immich-postgres` on omv) | | The k3s **server token and CA** (new ones are issued) |
 | Loki's old data directory (see 6.3) | | Helm release history (irrelevant on a fresh cluster) |
 
-**The database moved to `omv` on 2026-09-20** (`postgres/MIGRATION-TO-OMV.md`), so a Pi loss no longer takes it with it. (Until the old copy on the Pi is decommissioned it still exists there, but do not rely on it.) If Postgres is ever on the Pi's SD card again, a Pi loss also loses the database: restore the latest nightly dump (section 8.1), up to about 24 hours of changes.
+**The database moved to `omv` on 2026-09-20** (`clusters/raspberrypi/postgres/MIGRATION-TO-OMV.md`), so a Pi loss no longer takes it with it. (Until the old copy on the Pi is decommissioned it still exists there, but do not rely on it.) If Postgres is ever on the Pi's SD card again, a Pi loss also loses the database: restore the latest nightly dump (section 8.1), up to about 24 hours of changes.
 
 ### 0.1 Have these ready *before* you need them
 
@@ -134,7 +134,7 @@ Traefik, CoreDNS, `local-path` and metrics-server come with k3s and reappear on 
 ## 8. Variants and things that differ
 
 ### 8.1 Postgres still on the Pi (before the migration)
-The database is gone with the SD card. Restore the newest dump from `omv:/export/storage/Personal/Immich/backups/` into a fresh Postgres **with the `\restrict` lines stripped** (the documented `gunzip < dump | psql` fails on this image); the exact command and a measured 125 s restore time are in `postgres/MIGRATION-TO-OMV.md`.
+The database is gone with the SD card. Restore the newest dump from `omv:/export/storage/Personal/Immich/backups/` into a fresh Postgres **with the `\restrict` lines stripped** (the documented `gunzip < dump | psql` fails on this image); the exact command and a measured 125 s restore time are in `clusters/raspberrypi/postgres/MIGRATION-TO-OMV.md`.
 
 ### 8.2 The age key is lost (and so is every copy)
 The encrypted secrets are unreadable and must be replaced, not decrypted:
@@ -152,7 +152,7 @@ Out of scope: the photos, database dumps and Grafana/Prometheus data exist only 
 
 - **`flux bootstrap`** removes the SOPS decryption block; use step 5. **`k3s-agent-uninstall.sh`** deletes Loki's data; use step 4.
 - **Template changes need a chart version bump** (`monitoring/Chart.yaml`), otherwise Flux keeps deploying its old cached chart. (Changes to the HelmRelease's inlined `spec.values` do not.)
-- **Postgres and Immich are Flux-managed** (as of 2026-09-23; `clusters/raspberrypi/postgres/`, `clusters/raspberrypi/immich/`). Postgres's `Kustomization` was adopted deliberately staged (`suspend: true`, verified with a server-side dry-run diff, then flipped) because its `Deployment` uses `Recreate` strategy against a stateful, node-local volume — see `clusters/raspberrypi/postgres/README.md`.
+- **Postgres and Immich are Flux-managed** (as of 2026-09-23; `clusters/raspberrypi/postgres/`, `clusters/raspberrypi/immich/`). Postgres's *initial* takeover was staged through a dedicated, temporary `Kustomization` (`suspend: true`, verified with a server-side dry-run diff, then flipped) because its `Deployment` uses `Recreate` strategy against a stateful, node-local volume; that dedicated `Kustomization` was decommissioned 2026-09-26 once the takeover had run safely for days, unifying it into this directory the same way Immich already was — deleting a Flux `Kustomization` with `prune: true` runs its GC finalizer against what it applied, so that decommission was itself a two-PR sequence (`prune: false` first, then delete) — see `clusters/raspberrypi/postgres/README.md`.
 - **cert-manager was removed** (2026-09-23), not just left idle: `helm uninstall`, then its CRDs by hand (`helm.sh/resource-policy: keep` means `helm uninstall` leaves them behind on purpose), then `kubectl delete namespace cert-manager` (its namespace entry in Git carried `prune: disabled`, so removing it from Git alone would never have deleted the live namespace — same as every other namespace in `namespaces/namespaces.yaml`).
 - `flux suspend` is not reliable here: the Kustomization re-applies `suspend: false` from Git within minutes.
 - **Removing a field from Git does not always remove it from the cluster.** Flux applies with server-side apply, and a field owned by *two* managers survives when one of them stops applying it. This bit us when dropping Flux's GitHub token (2026-09-20): `spec.secretRef` on the GitRepository was co-owned by `kustomize-controller` and the `flux` bootstrap CLI, so merging the change did nothing until the field was removed by hand (`kubectl patch ... --type=json -p '[{"op":"remove","path":"/spec/secretRef"}]'`). Check who owns a field with `kubectl get <kind> <name> -o json --show-managed-fields` (kubectl hides them by default), and preview what Flux would do with `kubectl diff --server-side --field-manager=kustomize-controller -f <file>`: plain `kubectl diff` uses client-side logic and shows nothing for such a removal.

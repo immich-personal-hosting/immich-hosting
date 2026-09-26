@@ -1,6 +1,8 @@
-# Postgres storage on `omv` (node-local) -- not part of any Helm release, applied directly:
-#   kubectl apply -f postgres/pvc.yaml
-# See MIGRATION-TO-OMV.md for the migration from the Raspberry Pi and how to roll back.
+# Postgres storage on `omv` (node-local) -- not part of any Helm release. Flux-managed (this
+# directory, via the root flux-system Kustomization). Break-glass manual fallback if Flux is
+# suspended: kubectl apply -f clusters/raspberrypi/postgres/pvc.yaml
+# See MIGRATION-TO-OMV.md (this directory) for the migration from the Raspberry Pi and how to
+# roll back.
 #
 # SITE-SPECIFIC: `spec.local.path` below is the only place the data path is defined, and it is specific to this
 # installation. Replicating elsewhere? See "Replicating this setup elsewhere" in the repo README.md
@@ -20,10 +22,9 @@ kind: PersistentVolume
 metadata:
   name: postgres-omv-pv
   annotations:
-    # This is now Flux-managed (see clusters/raspberrypi/postgres/) with prune: true on
-    # the Kustomization. A PV holding the live Postgres data must never be deleted just
-    # because it was removed from Git — same reasoning, same annotation, as
-    # clusters/raspberrypi/namespaces/namespaces.yaml.
+    # Flux-managed (this directory, via the root flux-system Kustomization, prune: true).
+    # A PV holding the live Postgres data must never be deleted just because it was removed
+    # from Git — same reasoning, same annotation, as clusters/raspberrypi/namespaces/namespaces.yaml.
     kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   capacity:

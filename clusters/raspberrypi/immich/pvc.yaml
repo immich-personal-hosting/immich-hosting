@@ -3,7 +3,7 @@
 # Flux is suspended: kubectl apply -f clusters/raspberrypi/immich/pvc.yaml -n immich
 #
 # Split out of the combined immich-volumes.yaml on the Pi (which also has the Postgres
-# local-storage PV/PVC — see postgres/pvc.yaml at the repo root for that half). Verified
+# local-storage PV/PVC — see clusters/raspberrypi/postgres/pvc.yaml for that half). Verified
 # byte-identical to /home/divyakumarjain/photos/immich/k3s/immich-volumes.yaml and
 # immich-infra/docs/audit-raw/raw-manifests/immich-volumes.yaml.
 
@@ -13,7 +13,8 @@ metadata:
   name: immich-nfs-pv
   annotations:
     # Flux-managed with prune: true; an accidental Git-side removal must not delete the
-    # live photo library PV. Same pattern as postgres/pvc.yaml and namespaces/namespaces.yaml.
+    # live photo library PV. Same pattern as postgres/pvc.yaml and namespaces/namespaces.yaml
+    # (both under this same clusters/raspberrypi/ tree).
     kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   capacity:

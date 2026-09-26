@@ -28,7 +28,7 @@ The data directory is **deliberately not under `/export/storage`**: `omv` export
 
 ## Sequence (Immich is down from step 3 to step 9: about 15 minutes)
 
-Set once: `export KUBECONFIG=~/.kube/config-pi-admin`, `RAW=/srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329`, `D=$RAW/k8s/immich-postgres`. (`RAW` and `D` are **site-specific**: they must match `spec.local.path` in `postgres/pvc.yaml`. Replicating elsewhere: see "Replicating this setup elsewhere" in the repo README.)
+Set once: `export KUBECONFIG=~/.kube/config-pi-admin`, `RAW=/srv/dev-disk-by-uuid-36f537fb-c606-4ed2-ae22-55ad447d5329`, `D=$RAW/k8s/immich-postgres`. (`RAW` and `D` are **site-specific**: they must match `spec.local.path` in `pvc.yaml` (this directory). Replicating elsewhere: see "Replicating this setup elsewhere" in the repo README.)
 
 1. **Baseline** (save the output to compare later):
    `kubectl -n immich exec deploy/immich-postgres -- psql -U postgres -d immich -At -c "select (select count(*) from asset),(select count(*) from \"user\"),(select count(*) from album),(select count(*) from smart_search),(select count(*) from asset_face)"`

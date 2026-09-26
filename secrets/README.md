@@ -13,7 +13,7 @@ This directory itself holds no files and isn't referenced by any Flux Kustomizat
 rather than a stale, wrong description.
 
 For the record, this doc's original "known gaps" are closed:
-- `postgres/deployment.yaml`'s `POSTGRES_PASSWORD` and
+- `clusters/raspberrypi/postgres/deployment.yaml`'s `POSTGRES_PASSWORD` and
   `clusters/raspberrypi/immich/values.yaml`'s `DB_PASSWORD` both reference the
   SOPS-managed `immich-postgres-credentials` Secret via `secretKeyRef` — no plaintext
   literal.

@@ -1,6 +1,6 @@
 # Not Helm-managed — Postgres is deployed as a raw Kubernetes Deployment, not part of the
-# Immich Helm release. Apply with:
-#   kubectl apply -f deployment.yaml -n immich
+# Immich Helm release. Flux-managed (this directory, via the root flux-system Kustomization).
+# Break-glass manual fallback if Flux is suspended: kubectl apply -f deployment.yaml -n immich
 #
 # NOTE (2026-09-20): earlier versions of this header claimed the file was byte-identical to
 # the live cluster. It was not: it lacked the `args` below (`-c shared_preload_libraries=vchord.so`,
