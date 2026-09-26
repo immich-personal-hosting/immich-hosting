@@ -13,6 +13,17 @@
 # already lives under clusters/raspberrypi/secrets/, applied by the root flux-system
 # Kustomization, which already has the sops-age decryption block. This Kustomization only
 # needs to reference the Secret by name (postgres/deployment.yaml does, via secretKeyRef).
+#
+# prune: false as of 2026-09-26, ahead of decommissioning this Kustomization entirely
+# (postgres/ is being unified into clusters/raspberrypi/postgres/, matching how Immich's
+# raw manifests are laid out — no more repo-root split). Deleting a Flux Kustomization
+# object with prune: true runs its garbage-collection finalizer against everything it ever
+# applied — here, the live immich-postgres Deployment and Service (the PV/PVC are separately
+# protected by their own kustomize.toolkit.fluxcd.io/prune: disabled annotations, but the
+# Deployment/Service are not). Flipping to prune: false here FIRST, as its own reviewed and
+# merged change, means that when this Kustomization is deleted in the follow-up PR, its
+# finalizer does nothing — the Deployment/Service simply continue running, now picked up
+# directly by the root flux-system Kustomization instead.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -22,7 +33,7 @@ spec:
   interval: 10m
   suspend: false
   path: ./postgres
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
