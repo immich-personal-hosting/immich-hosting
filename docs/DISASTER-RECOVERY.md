@@ -122,6 +122,11 @@ reconciling on a rebuild, set `clusters/raspberrypi/immich/helmrelease.yaml`'s
 it back to `false` — the same staging technique used to originally adopt it.
 
 Traefik, CoreDNS, `local-path` and metrics-server come with k3s and reappear on their own. [V: cluster inventory]
+**Caveat (2026-09-26):** Traefik's structured-logging `HelmChartConfig` currently exists only
+as an unversioned static file on the Pi's SD card (`/var/lib/rancher/k3s/server/manifests/`,
+inferred) — a fresh k3s install would come back with vanilla Traefik defaults, silently
+losing this customization, until `clusters/raspberrypi/traefik/` (in progress, see its
+README.md) is actually merged and reconciling.
 
 ## 7. Verify
 

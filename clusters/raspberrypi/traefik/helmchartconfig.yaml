@@ -1,0 +1,41 @@
+# Traefik itself is k3s-bundled (its HelmChart is created and applied by k3s's own Addon
+# controller, not by this repo — see README.md's Components table). This file brings only
+# its *customization* — a HelmChartConfig, k3s's mechanism for overriding a bundled
+# component's chart values — under Flux, since it isn't part of any chart source this repo
+# controls.
+#
+# Recovered from live cluster state (kubectl get helmchartconfig traefik -n kube-system -o
+# yaml), 2026-09-26 — the content below matches it exactly. Not previously in git at all:
+# the live object's owner metadata (owner-gvk: k3s.cattle.io/v1, Kind=Addon, owner-name:
+# traefik-logs-config) strongly suggests it exists only as a static file at
+# /var/lib/rancher/k3s/server/manifests/traefik-logs-config.yaml on the Pi's SD card —
+# unread directly (root-only, no passwordless sudo there) — created 2026-08-09, entirely
+# outside Git and outside this repo's own backup/versioning story.
+#
+# DO NOT MERGE THIS until that static file is gone from the Pi. This file lives directly
+# under clusters/raspberrypi/ — the root flux-system Kustomization picks it up and applies
+# it on its very next reconcile after merge, with no suspend gate (unlike Postgres's
+# Deployment, this object is a plain, stateless customization CR with no restart risk, which
+# is why it doesn't get a dedicated staged Kustomization the way Postgres's does). k3s's own
+# Addon controller continuously re-applies its version of this same object for as long as
+# that file exists, the same way kustomize-controller continuously re-applies what's in Git
+# — two independent controllers managing the same live object is exactly the class of
+# problem that already bit this repo once (the GitHub-token secretRef co-ownership issue).
+# See clusters/raspberrypi/traefik/README.md for the required sequence — it must happen
+# BEFORE this PR is merged, not after.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  failurePolicy: reinstall
+  valuesContent: |-
+    # ENABLES STRUCTURED OBSERVABILITY LOGGING
+    logs:
+      general:
+        format: json
+        level: INFO
+      access:
+        enabled: true
+        format: json
