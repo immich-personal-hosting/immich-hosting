@@ -14,7 +14,7 @@ controllers:
     containers:
       main:
         image:
-          tag: v3.1.0
+          tag: v3.2.4
         # Sized from 28d of Prometheus cAdvisor history (2026-09-20): memory working set
         # p99 ~1.1Gi, max ~1.7Gi; CPU ~5m at p95 with a short spike to ~1.9 cores. Memory
         # limit = max + ~50%. No CPU limit on purpose, to avoid throttling those spikes.
