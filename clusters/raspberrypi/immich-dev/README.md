@@ -8,7 +8,7 @@ features that are not in an upstream release yet, currently the *face graph* (Ut
 |---|---|---|
 | Hostname | `immich.raspberrypi` | `dev.immich.raspberrypi` |
 | Managed by | Helm chart, `../immich/` | raw manifests, this directory |
-| Image | `ghcr.io/immich-app/immich-server:v3.2.4` | `ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.1` |
+| Image | `ghcr.io/immich-app/immich-server:v3.2.4` | `ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.2` |
 | Workers | API + background jobs | API only |
 | Database, Valkey, machine-learning, photo library | — | **the same ones** |
 
@@ -58,7 +58,7 @@ From the fork https://github.com/divyakumarjain/immich, branch `feat/face-graph-
 docker buildx build --platform linux/arm64 -f server/Dockerfile \
   --build-arg BUILD_SOURCE_REF=feat/face-graph-v3.2.4 \
   --build-arg BUILD_SOURCE_COMMIT=$(git rev-parse HEAD) \
-  -t ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.1 --push .
+  -t ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.2 --push .
 ```
 
 Both nodes are arm64, so one platform is enough. The package must be **public** on ghcr.io:
