@@ -1,0 +1,112 @@
+# Custom Immich build (upstream v3.2.4 + the face graph feature) that shares the database,
+# Valkey, machine-learning service and photo library with the real `immich-server`.
+# Not part of the Helm release; Flux applies it from this directory.
+#
+# Three things make sharing safe, keep all of them (details in README.md):
+#   1. The image is built from the SAME upstream version as ../immich/values.yaml and adds
+#      no database migrations.
+#   2. DB_SKIP_MIGRATIONS=true: this pod can never change the schema, even by mistake.
+#   3. IMMICH_WORKERS_INCLUDE=api: it serves the web app and API only. Background jobs it
+#      queues go to the shared Valkey and are run by the real server.
+#
+# Labels: `app.kubernetes.io/name: server` is what the NetworkPolicies in
+# ../network-policies/immich.yaml match, so this pod gets the same access as the real server
+# (Traefik in; Postgres, Valkey and machine-learning out). `app.kubernetes.io/instance:
+# immich-dev` keeps it out of the real `immich-server` Service, whose selector requires
+# `instance: immich`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-dev-server
+  namespace: immich
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/instance: immich-dev
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  # Recreate: never two dev pods at once, the Pi has no memory to spare for a surge pod.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: server
+      app.kubernetes.io/instance: immich-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: server
+        app.kubernetes.io/instance: immich-dev
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: main
+          # Built from branch feat/face-graph-v3.2.4 of the Immich source (tag v3.2.4 + one
+          # commit). The version prefix must match ../immich/values.yaml.
+          image: ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: IMMICH_WORKERS_INCLUDE
+              value: api
+            - name: DB_SKIP_MIGRATIONS
+              value: "true"
+            - name: DB_HOSTNAME
+              value: immich-postgres-service
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USERNAME
+              value: postgres
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: immich-postgres-credentials
+                  key: postgres-password
+            - name: DB_DATABASE_NAME
+              value: immich
+            - name: REDIS_HOSTNAME
+              value: immich-valkey
+            - name: IMMICH_MACHINE_LEARNING_URL
+              value: http://immich-machine-learning:3003
+            - name: IMMICH_LOG_FORMAT
+              value: json
+          ports:
+            - name: http
+              containerPort: 2283
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /api/server/ping
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /api/server/ping
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/server/ping
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # API worker only, so below the real server (1Gi request, 2560Mi limit). Measured
+          # with a local copy of this image against a small test library: ~510Mi after start.
+          # The limit leaves room for the face graph, which loads face embeddings into memory.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        # Same photo library as the real server (NFS, ReadWriteMany): thumbnails and originals
+        # are read from here, and uploads made through the dev hostname land here too.
+        - name: data
+          persistentVolumeClaim:
+            claimName: immich-nfs-pvc
