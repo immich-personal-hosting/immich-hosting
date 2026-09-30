@@ -1,0 +1,10 @@
+# A second Immich server that runs a custom build next to the real one, reachable at
+# dev.immich.raspberrypi. See README.md in this directory before changing anything here,
+# and before bumping the Immich version in ../immich/values.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: immich
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml

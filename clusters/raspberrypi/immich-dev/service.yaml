@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-dev-server
+  namespace: immich
+  labels:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/instance: immich-dev
+spec:
+  selector:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/instance: immich-dev
+  ports:
+    - name: http
+      port: 2283
+      targetPort: http
+      protocol: TCP

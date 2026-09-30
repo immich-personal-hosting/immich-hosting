@@ -1,0 +1,24 @@
+# dev.immich.raspberrypi -> the custom build. Same entrypoint and upload buffering
+# middleware as ../immich/ingress.yaml (the Middleware itself is defined there).
+# Plain HTTP on the LAN, for the reasons given in that file.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: immich-dev-ingress
+  namespace: immich
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: immich-immich-buffering@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: "dev.immich.raspberrypi"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: immich-dev-server
+                port:
+                  number: 2283
