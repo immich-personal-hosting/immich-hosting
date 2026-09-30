@@ -44,7 +44,7 @@ spec:
         - name: main
           # Built from branch feat/face-graph-v3.2.4 of github.com/divyakumarjain/immich (tag
           # v3.2.4 + one commit). The version prefix must match ../immich/values.yaml.
-          image: ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.2
+          image: ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.3
           imagePullPolicy: IfNotPresent
           env:
             - name: IMMICH_WORKERS_INCLUDE
