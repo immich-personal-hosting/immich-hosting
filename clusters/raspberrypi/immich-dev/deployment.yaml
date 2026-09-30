@@ -42,8 +42,8 @@ spec:
       enableServiceLinks: false
       containers:
         - name: main
-          # Built from branch feat/face-graph-v3.2.4 of the Immich source (tag v3.2.4 + one
-          # commit). The version prefix must match ../immich/values.yaml.
+          # Built from branch feat/face-graph-v3.2.4 of github.com/divyakumarjain/immich (tag
+          # v3.2.4 + one commit). The version prefix must match ../immich/values.yaml.
           image: ghcr.io/divyakumarjain/immich-server:v3.2.4-face-graph.1
           imagePullPolicy: IfNotPresent
           env:

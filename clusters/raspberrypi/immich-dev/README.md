@@ -51,7 +51,8 @@ queued in an old format. It will not migrate anything itself (rule 2).
 
 ## Building the image
 
-From the Immich source, branch `feat/face-graph-v3.2.4` (tag `v3.2.4` + one commit):
+From the fork https://github.com/divyakumarjain/immich, branch `feat/face-graph-v3.2.4`
+(tag `v3.2.4` + one commit):
 
 ```sh
 docker buildx build --platform linux/arm64 -f server/Dockerfile \
