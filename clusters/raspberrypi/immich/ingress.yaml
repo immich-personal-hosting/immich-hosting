@@ -12,7 +12,10 @@ metadata:
   namespace: immich
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
-    traefik.ingress.kubernetes.io/router.middlewares: immich-immich-buffering@kubernetescrd
+    # No buffering middleware (removed 2026-11-08). Traefik has no request body size limit by
+    # default, and the old `immich-buffering` Middleware spooled every upload to the Traefik
+    # pod's /tmp before forwarding a byte to Immich. Upload timeouts are handled on the `web`
+    # entrypoint instead: see clusters/raspberrypi/traefik/helmchartconfig.yaml.
 
 spec:
   # CRITICAL ROUTING FIX: This forces Traefik to look at this Ingress file
@@ -28,16 +31,6 @@ spec:
             name: immich-server
             port:
               number: 2283
-
----
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: immich-buffering
-  namespace: immich
-spec:
-  buffering:
-    maxRequestBodyBytes: 10485760000 # Fixes the cutoff text to a clean 10GB buffer limit
 
 # TLS: deliberately deferred (decision 2026-09-20). This Ingress serves plaintext HTTP on the
 # LAN. `immich.raspberrypi` is a private name, so public ACME can't issue for it, and no public
