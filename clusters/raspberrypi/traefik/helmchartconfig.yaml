@@ -39,3 +39,17 @@ spec:
       access:
         enabled: true
         format: json
+    # LARGE UPLOADS (2026-11-08): Traefik v3 defaults the entrypoint readTimeout to 60s,
+    # which covers reading the whole request body. Large video uploads from the Immich
+    # mobile app over the LAN take longer than that, so Traefik cancelled them at exactly
+    # 60.000s and answered 499 "Client Closed Request" (access log: Duration 60000395202,
+    # OriginStatus 0, RequestContentSize 420254722 on POST /api/assets). Disable the read and
+    # write deadlines on `web` (the only entrypoint Immich uses); keep a bound on idle
+    # keep-alive connections.
+    ports:
+      web:
+        transport:
+          respondingTimeouts:
+            readTimeout: 0
+            writeTimeout: 0
+            idleTimeout: 600s
